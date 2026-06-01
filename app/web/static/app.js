@@ -18,6 +18,7 @@ const targetFiles = document.querySelector("#targetFiles");
 const timelinePanel = document.querySelector("#timelinePanel");
 const impactPanel = document.querySelector("#impactPanel");
 const addonsPanel = document.querySelector("#addonsPanel");
+const readinessPanel = document.querySelector("#readinessPanel");
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -510,6 +511,35 @@ async function runGithubDemo() {
   renderAddonResult("GitHub Demo Flow", result);
 }
 
+async function loadSubmissionBrief() {
+  const projectId = await requireProject();
+  const result = await api(`/api/projects/${projectId}/submission/brief`);
+  renderReadinessResult("Submission Brief", result);
+}
+
+async function loadCloudRunEvidence() {
+  const projectId = await requireProject();
+  const result = await api(`/api/projects/${projectId}/runtime/cloud-run`);
+  renderReadinessResult("Cloud Run Evidence", result);
+}
+
+async function loadAdapterInventory() {
+  const projectId = await requireProject();
+  const result = await api(`/api/projects/${projectId}/adapters`);
+  renderReadinessResult("Adapter Inventory", result);
+}
+
+async function runFailureDemo() {
+  const projectId = await requireProject();
+  const result = await api(`/api/projects/${projectId}/apply/failure-demo`, {
+    method: "POST",
+    body: JSON.stringify({
+      error_text: document.querySelector("#failureText").value,
+    }),
+  });
+  renderReadinessResult("Failure Recovery Demo", result);
+}
+
 async function loadFailureGuidance() {
   const projectId = await requireProject();
   const result = await api(`/api/projects/${projectId}/apply/failure-guidance`, {
@@ -525,6 +555,12 @@ function renderAddonResult(title, result) {
   addonsPanel.classList.remove("empty");
   addonsPanel.replaceChildren();
   addonsPanel.appendChild(renderDocument(title, JSON.stringify(result, null, 2)));
+}
+
+function renderReadinessResult(title, result) {
+  readinessPanel.classList.remove("empty");
+  readinessPanel.replaceChildren();
+  readinessPanel.appendChild(renderDocument(title, JSON.stringify(result, null, 2)));
 }
 
 async function loadDocuments() {
@@ -630,6 +666,10 @@ async function loadTimeline() {
     appendText(details, "span", `Agent: ${event.agent_name || "-"}`);
     appendText(details, "span", `When: ${event.occurred_at}`);
     appendText(details, "span", `Reason: ${event.rationale_md || "No rationale recorded."}`);
+    appendText(details, "span", `Decision: ${event.metadata?.decision || "-"}`);
+    appendText(details, "span", `Tool: ${event.metadata?.tool_boundary || "-"}`);
+    appendText(details, "span", `Adapter: ${event.metadata?.adapter_mode || "-"}`);
+    appendText(details, "span", `Next: ${event.metadata?.next_expected_action || "-"}`);
     details.appendChild(renderMiniJson(event.metadata || {}));
     timelinePanel.appendChild(details);
   }
@@ -728,6 +768,10 @@ document.querySelector("#deleteEdgeButton").addEventListener("click", () => with
 document.querySelector("#targetAppForm").addEventListener("submit", (event) => withBusy(() => generateTargetApp(event)));
 document.querySelector("#reviewTargetAppButton").addEventListener("click", () => withBusy(reviewTargetApp));
 document.querySelector("#imageRequirementButton").addEventListener("click", () => withBusy(captureImageRequirement));
+document.querySelector("#submissionBriefButton").addEventListener("click", () => withBusy(loadSubmissionBrief));
+document.querySelector("#cloudRunEvidenceButton").addEventListener("click", () => withBusy(loadCloudRunEvidence));
+document.querySelector("#adapterInventoryButton").addEventListener("click", () => withBusy(loadAdapterInventory));
+document.querySelector("#failureDemoButton").addEventListener("click", () => withBusy(runFailureDemo));
 document.querySelector("#securityLoopButton").addEventListener("click", () => withBusy(runSecurityLoop));
 document.querySelector("#terraformPreviewButton").addEventListener("click", () => withBusy(loadTerraformPreview));
 document.querySelector("#githubDemoButton").addEventListener("click", () => withBusy(runGithubDemo));

@@ -42,12 +42,14 @@ class OpsDashboardService:
                 "project_id": project["id"],
                 "phase": project["phase"],
                 "health": "deployed" if project["phase"] == "DEPLOYED" else "in_progress",
+                "runtime_product": "Cloud Run",
             },
             "architecture_map": architecture["spec"] if architecture else None,
-            "deployment_status": deployment,
+            "deployment_status": _deployment_status(deployment, architecture),
             "logs_errors": {
                 "items": [],
-                "summary": "Cloud Logging adapter is not configured in demo mode.",
+                "summary": "Cloud Logging live adapter is not configured in demo mode.",
+                "adapter_mode": "demo_adapter",
             },
             "cost_overview": _estimate_cost(architecture),
             "security_overview": _security_summary(findings),
@@ -94,6 +96,38 @@ def _node_cost(node_type: str) -> int:
         "external": 0,
     }
     return estimates.get(node_type, 0)
+
+
+def _deployment_status(
+    deployment: dict[str, Any] | None,
+    architecture: dict[str, Any] | None,
+) -> dict[str, Any]:
+    service_name = "backend"
+    region = architecture["spec"]["region"] if architecture else "asia-northeast1"
+    if deployment is None:
+        return {
+            "latest_deployment": None,
+            "cloud_run": {
+                "service_name": service_name,
+                "region": region,
+                "status": "not_deployed",
+                "adapter_mode": "demo_adapter",
+            },
+        }
+    revision_suffix = deployment["build_id"][-8:]
+    return {
+        "latest_deployment": deployment,
+        "cloud_run": {
+            "service_name": service_name,
+            "region": region,
+            "url": deployment["deployed_url"],
+            "revision": f"{service_name}-{revision_suffix}",
+            "status": deployment["status"],
+            "authentication": "private-by-default demo; public target apps require explicit approval",
+            "adapter_mode": "demo_adapter",
+            "runtime_product": "Cloud Run",
+        },
+    }
 
 
 def _security_summary(findings: list[Any]) -> dict[str, Any]:

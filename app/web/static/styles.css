@@ -97,6 +97,7 @@ body.applying .lockStatus {
 .docs,
 .target,
 .ops,
+.readiness,
 .addons,
 .timeline,
 .output {
@@ -409,6 +410,7 @@ pre {
   .docs,
   .target,
   .ops,
+  .readiness,
   .addons,
   .timeline,
   .output {
