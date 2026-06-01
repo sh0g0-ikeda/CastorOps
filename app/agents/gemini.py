@@ -19,7 +19,7 @@ from app.core.errors import ValidationAppError
 from app.documents.models import DocumentType
 
 
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+DEFAULT_GEMINI_MODEL = "gemini-3-flash-preview"
 DEFAULT_GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta"
 
 
