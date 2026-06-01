@@ -20,6 +20,37 @@ const timelinePanel = document.querySelector("#timelinePanel");
 const impactPanel = document.querySelector("#impactPanel");
 const addonsPanel = document.querySelector("#addonsPanel");
 const readinessPanel = document.querySelector("#readinessPanel");
+const nextActionView = document.querySelector("#nextAction");
+const progressMeter = document.querySelector("#progressMeter");
+const activityLog = document.querySelector("#activityLog");
+const stageElements = {
+  requirements: document.querySelector('[data-stage="requirements"]'),
+  design: document.querySelector('[data-stage="design"]'),
+  architecture: document.querySelector('[data-stage="architecture"]'),
+  apply: document.querySelector('[data-stage="apply"]'),
+  ops: document.querySelector('[data-stage="ops"]'),
+};
+const stageState = {
+  requirements: "idle",
+  design: "idle",
+  architecture: "idle",
+  apply: "idle",
+  ops: "idle",
+};
+const stageLabels = {
+  requirements: "要件定義",
+  design: "設計書",
+  architecture: "クラウド構成",
+  apply: "アプリ生成/Apply",
+  ops: "運用確認",
+};
+const defaultStageNotes = {
+  requirements: "追加質問と要件定義書を作ります。",
+  design: "設計書セットを生成し、承認します。",
+  architecture: "GCP構成、影響、セキュリティを確認します。",
+  apply: "生成コードとApply結果を確認します。",
+  ops: "ダッシュボード、判断履歴、提出材料を確認します。",
+};
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -47,6 +78,7 @@ async function refreshProject() {
   const project = await api(`/api/projects/${state.projectId}`);
   projectIdView.textContent = project.id;
   projectPhaseView.textContent = project.phase;
+  return project;
 }
 
 function persistProjectId(projectId) {
@@ -84,7 +116,8 @@ async function restoreWorkspace() {
     return;
   }
   try {
-    await refreshProject();
+    const project = await refreshProject();
+    hydrateStageState(project?.phase);
     await refreshWorkspacePanels();
     serverStatus.textContent = "サーバ準備完了 - ワークスペース復元済み";
   } catch (error) {
@@ -93,6 +126,8 @@ async function restoreWorkspace() {
       state.projectId = null;
       projectIdView.textContent = "-";
       projectPhaseView.textContent = "-";
+      resetStages();
+      setNextAction("保存済みワークスペースが見つかりません。デモ一括実行で再作成してください。");
       serverStatus.textContent = "サーバ準備完了 - デモ一括実行で状態を再作成できます";
       return;
     }
@@ -121,6 +156,7 @@ async function safeLoad(loader) {
 }
 
 async function createProject() {
+  setNextAction("プロジェクトを作成しています。次は要件定義書を作ります。");
   const data = await api("/api/projects", {
     method: "POST",
     body: JSON.stringify({
@@ -132,6 +168,9 @@ async function createProject() {
   persistProjectId(data.id);
   projectIdView.textContent = data.id;
   projectPhaseView.textContent = data.phase;
+  hydrateStageState(data.phase);
+  addActivity(`プロジェクトを作成しました: ${data.name}`);
+  setNextAction("次は「要件定義書を作成」を押してください。");
 }
 
 async function requireProject() {
@@ -146,41 +185,100 @@ async function requireProject() {
 
 async function runStep(step) {
   const projectId = await requireProject();
-  if (step === "follow-up") {
-    await api(`/api/projects/${projectId}/follow-up`, { method: "POST", body: "{}" });
-  } else if (step === "requirements") {
-    await api(`/api/projects/${projectId}/requirements`, { method: "POST", body: "{}" });
-    await loadDocuments();
-  } else if (step === "approve-requirements") {
-    await approveWithModal("requirements");
-  } else if (step === "designs") {
-    await api(`/api/projects/${projectId}/designs`, { method: "POST", body: "{}" });
-    await loadDocuments();
-  } else if (step === "approve-design") {
-    await approveWithModal("design");
-  } else if (step === "architecture") {
-    await api(`/api/projects/${projectId}/architecture`, {
-      method: "POST",
-      body: JSON.stringify({ target_project_id: document.querySelector("#targetProjectId").value }),
-    });
-    await loadArchitecture();
-  } else if (step === "security") {
-    await api(`/api/projects/${projectId}/security`, { method: "POST", body: "{}" });
-    await loadOps();
-  } else if (step === "approve-architecture") {
-    await approveWithModal("architecture");
-    await loadTimeline();
-  } else if (step === "target-app") {
-    await generateTargetApp();
-    await loadTargetApp();
-  } else if (step === "apply") {
-    await applyArchitecture();
-  } else if (step === "ops") {
-    await loadOps();
-  } else if (step === "timeline") {
-    await loadTimeline();
+  const stage = stageForStep(step);
+  if (stage) {
+    setStage(stage, "running", stepStartMessage(step));
   }
-  await refreshProject();
+  addActivity(stepStartMessage(step));
+  try {
+    if (step === "follow-up") {
+      await api(`/api/projects/${projectId}/follow-up`, { method: "POST", body: "{}" });
+      setStage("requirements", "running", "追加質問を作成しました。要件定義書を作成してください。");
+      setNextAction("追加質問を確認し、次に「要件定義書を作成」を押します。");
+    } else if (step === "requirements") {
+      await api(`/api/projects/${projectId}/requirements`, { method: "POST", body: "{}" });
+      await loadDocuments();
+      setStage("requirements", "running", "要件定義書を作成しました。確認して承認すると次へ進めます。");
+      setNextAction("生成された設計書パネルで要件定義書を確認し、「要件を承認」を押してください。");
+    } else if (step === "approve-requirements") {
+      const approved = await approveWithModal("requirements");
+      if (!approved) {
+        setStage("requirements", "running", "要件承認はキャンセルされました。承認すると設計書生成に進めます。");
+        setNextAction("要件定義書を確認し、問題なければ「要件を承認」を押してください。");
+        addActivity("要件承認をキャンセルしました。");
+        return;
+      }
+      setStage("requirements", "done", "要件を承認しました。");
+      setNextAction("次は「設計書を生成」を押してください。");
+    } else if (step === "designs") {
+      await api(`/api/projects/${projectId}/designs`, { method: "POST", body: "{}" });
+      await loadDocuments();
+      setStage("design", "running", "設計書セットを生成しました。確認して承認すると次へ進めます。");
+      setNextAction("生成された設計書を確認し、「設計を承認」を押してください。");
+    } else if (step === "approve-design") {
+      const approved = await approveWithModal("design");
+      if (!approved) {
+        setStage("design", "running", "設計承認はキャンセルされました。承認すると構成案作成に進めます。");
+        setNextAction("設計書セットを確認し、問題なければ「設計を承認」を押してください。");
+        addActivity("設計承認をキャンセルしました。");
+        return;
+      }
+      setStage("design", "done", "設計を承認しました。");
+      setNextAction("次は「構成案を作成」を押してください。");
+    } else if (step === "architecture") {
+      await api(`/api/projects/${projectId}/architecture`, {
+        method: "POST",
+        body: JSON.stringify({ target_project_id: document.querySelector("#targetProjectId").value }),
+      });
+      await loadArchitecture();
+      setStage("architecture", "running", "GCP構成案を作成しました。次にセキュリティ評価を実行してください。");
+      setNextAction("クラウド構成マップを確認し、「セキュリティ評価」を押してください。");
+    } else if (step === "security") {
+      await api(`/api/projects/${projectId}/security`, { method: "POST", body: "{}" });
+      await loadOps();
+      setStage("architecture", "running", "セキュリティ評価まで完了しました。構成承認を待っています。");
+      setNextAction("構成とセキュリティ評価を確認し、「構成を承認」を押してください。");
+    } else if (step === "approve-architecture") {
+      const approved = await approveWithModal("architecture");
+      if (!approved) {
+        setStage("architecture", "running", "構成承認はキャンセルされました。承認するとアプリ生成とApplyに進めます。");
+        setNextAction("構成とセキュリティ評価を確認し、問題なければ「構成を承認」を押してください。");
+        addActivity("構成承認をキャンセルしました。");
+        return;
+      }
+      await loadTimeline();
+      setStage("architecture", "done", "クラウド構成を承認しました。");
+      setNextAction("次は「アプリを生成」を押してください。");
+    } else if (step === "target-app") {
+      await generateTargetApp();
+      await loadTargetApp();
+      setStage("apply", "running", "アプリコードを生成しました。生成コードを確認してください。");
+      setNextAction("生成コードを確認し、問題なければ「Applyする」を押してください。");
+    } else if (step === "apply") {
+      const applied = await applyArchitecture();
+      if (!applied) {
+        setStage("apply", "running", "Applyはキャンセルされました。実行すると運用ダッシュボードに進めます。");
+        setNextAction("生成コードと承認済み構成を確認し、問題なければ「Applyする」を押してください。");
+        addActivity("Applyをキャンセルしました。");
+        return;
+      }
+      setStage("apply", "done", "Applyが完了しました。");
+      setNextAction("次は「運用ダッシュボードを見る」を押してください。");
+    } else if (step === "ops") {
+      await loadOps();
+      setStage("ops", "running", "運用ダッシュボードを更新しました。判断履歴も確認してください。");
+      setNextAction("次は「判断履歴を見る」を押してください。");
+    } else if (step === "timeline") {
+      await loadTimeline();
+      setStage("ops", "done", "判断履歴まで確認できます。提出準備も確認してください。");
+      setNextAction("最後に「提出準備を見る」で審査用の説明材料を確認してください。");
+    }
+    await refreshProject();
+    addActivity(stepDoneMessage(step));
+  } catch (error) {
+    markStepFailed(step, error);
+    throw error;
+  }
 }
 
 async function scrollToTarget(targetId) {
@@ -208,9 +306,10 @@ async function approveWithModal(gate) {
     "承認する",
   );
   if (!approved) {
-    return;
+    return false;
   }
   await approve(gate);
+  return true;
 }
 
 async function approve(gate) {
@@ -228,6 +327,9 @@ async function approve(gate) {
 
 async function runDemoFlow() {
   setApplyLock(true);
+  setAllStages("running", "デモ一括実行中です。エージェントが要件、設計、構成、Apply、運用確認を順番に処理しています。");
+  setNextAction("デモ一括実行中です。完了までこのまま待ってください。");
+  addActivity("デモ一括実行を開始しました。");
   try {
     const result = await api("/api/demo/run", {
       method: "POST",
@@ -242,6 +344,14 @@ async function runDemoFlow() {
     state.projectId = result.project_id;
     persistProjectId(result.project_id);
     renderFullWorkspace(result);
+    setAllStages("done", "デモ一括実行で完了しました。各パネルで成果物を確認できます。");
+    setNextAction("まず「クラウド構成マップ」と「実行タイムライン」を確認してください。");
+    addActivity("デモ一括実行が完了しました。要件、設計、構成、Apply、運用確認まで作成済みです。");
+  } catch (error) {
+    setAllStages("blocked", "デモ一括実行が途中で停止しました。最新レスポンスのエラーを確認してください。");
+    setNextAction("最新レスポンスを確認し、入力またはサーバ設定を修正して再実行してください。");
+    addActivity(`デモ一括実行に失敗しました: ${error.message}`);
+    throw error;
   } finally {
     setApplyLock(false);
   }
@@ -273,6 +383,7 @@ function renderFullWorkspace(result) {
   if (result.optional_delivery) {
     renderAddonResult("追加デモ証跡", result.optional_delivery);
   }
+  summarizeDemoResult(result);
 }
 
 async function loadArchitecture() {
@@ -384,6 +495,9 @@ async function saveNodeEdit(event) {
   });
   await loadArchitecture();
   await loadTimeline();
+  setStage("architecture", "running", "構成ドラフトを更新しました。再度、構成承認とApplyが必要です。");
+  setNextAction("変更後の構成を確認し、「構成を承認」を押してください。");
+  addActivity("構成ドラフトを保存しました。");
 }
 
 async function deleteNode() {
@@ -422,6 +536,9 @@ async function deleteNode() {
     }),
   });
   await loadArchitecture();
+  setStage("architecture", "running", "ノード削除をドラフトに反映しました。Apply前に構成承認が必要です。");
+  setNextAction("変更後の構成を確認し、「構成を承認」を押してください。");
+  addActivity(`ノード削除ドラフトを作成しました: ${nodeId}`);
 }
 
 async function reviseFromChat(event) {
@@ -448,6 +565,9 @@ async function reviseFromChat(event) {
     "閉じる",
   );
   await loadArchitecture();
+  setStage("architecture", "running", "自然文から新しい構成ドラフトを作成しました。");
+  setNextAction("再提案された構成を確認し、「構成を承認」を押してください。");
+  addActivity("自然文の変更依頼から構成ドラフトを作成しました。");
 }
 
 async function addNode(event) {
@@ -473,6 +593,9 @@ async function addNode(event) {
     "閉じる",
   );
   await loadArchitecture();
+  setStage("architecture", "running", "ノード追加をドラフトに反映しました。Apply前に構成承認が必要です。");
+  setNextAction("追加されたノードを確認し、「構成を承認」を押してください。");
+  addActivity(`ノード追加ドラフトを作成しました: ${result.node_id}`);
 }
 
 async function addEdge(event) {
@@ -499,6 +622,9 @@ async function addEdge(event) {
     "閉じる",
   );
   await loadArchitecture();
+  setStage("architecture", "running", "接続追加をドラフトに反映しました。Apply前に構成承認が必要です。");
+  setNextAction("追加された接続を確認し、「構成を承認」を押してください。");
+  addActivity(`接続追加ドラフトを作成しました: ${result.edge_id}`);
 }
 
 async function deleteEdge() {
@@ -523,6 +649,9 @@ async function deleteEdge() {
     }),
   });
   await loadArchitecture();
+  setStage("architecture", "running", "接続削除をドラフトに反映しました。Apply前に構成承認が必要です。");
+  setNextAction("変更後の構成を確認し、「構成を承認」を押してください。");
+  addActivity(`接続削除ドラフトを作成しました: ${edgeId}`);
 }
 
 function nodePatchPayload() {
@@ -583,13 +712,14 @@ async function applyArchitecture() {
     "Apply",
   );
   if (!approved) {
-    return;
+    return false;
   }
   setApplyLock(true);
   try {
     await api(`/api/projects/${projectId}/apply`, { method: "POST", body: "{}" });
     await loadOps();
     await loadTimeline();
+    return true;
   } finally {
     setApplyLock(false);
   }
@@ -747,6 +877,9 @@ async function generateTargetApp(event) {
     }),
   });
   await loadTargetApp();
+  setStage("apply", "running", "アプリコードを生成しました。生成コードを確認してください。");
+  setNextAction("生成コードを確認し、問題なければ「Applyする」を押してください。");
+  addActivity("サンプルアプリのコードを生成しました。");
 }
 
 async function reviewTargetApp() {
@@ -840,6 +973,217 @@ function renderMiniJson(value) {
   pre.className = "miniJson";
   pre.textContent = JSON.stringify(value ?? null, null, 2);
   return pre;
+}
+
+function setStage(stage, status, note) {
+  stageState[stage] = status;
+  const element = stageElements[stage];
+  if (!element) {
+    return;
+  }
+  element.classList.toggle("isRunning", status === "running");
+  element.classList.toggle("isDone", status === "done");
+  element.classList.toggle("isBlocked", status === "blocked");
+  const badge = element.querySelector(".stateBadge");
+  if (badge) {
+    badge.textContent = statusLabel(status);
+  }
+  const noteElement = element.querySelector("p");
+  if (noteElement && note) {
+    noteElement.textContent = note;
+  }
+  updateProgress();
+}
+
+function setAllStages(status, note) {
+  for (const stage of Object.keys(stageElements)) {
+    setStage(stage, status, note);
+  }
+}
+
+function resetStages() {
+  for (const [stage, note] of Object.entries(defaultStageNotes)) {
+    setStage(stage, "idle", note);
+  }
+}
+
+function hydrateStageState(phase) {
+  resetStages();
+  if (!phase || phase === "DRAFT") {
+    setNextAction("作業フローの「追加質問を作る」または「要件定義書を作成」から始めてください。");
+    return;
+  }
+
+  if ([
+    "REQUIREMENT_DRAFT",
+    "REQUIREMENT_APPROVED",
+    "DESIGN_DRAFT",
+    "DESIGN_APPROVED",
+    "ARCHITECTURE_DRAFT",
+    "SECURITY_REVIEW",
+    "ARCHITECTURE_APPROVED",
+    "READY_TO_APPLY",
+    "APPLYING",
+    "APPLY_FAILED",
+    "DEPLOYED",
+  ].includes(phase)) {
+    setStage("requirements", "done", "要件定義書は作成・承認済みです。");
+  }
+  if ([
+    "DESIGN_DRAFT",
+    "DESIGN_APPROVED",
+    "ARCHITECTURE_DRAFT",
+    "SECURITY_REVIEW",
+    "ARCHITECTURE_APPROVED",
+    "READY_TO_APPLY",
+    "APPLYING",
+    "APPLY_FAILED",
+    "DEPLOYED",
+  ].includes(phase)) {
+    setStage("design", "done", "設計書セットは作成・承認済みです。");
+  }
+  if ([
+    "ARCHITECTURE_APPROVED",
+    "READY_TO_APPLY",
+    "APPLYING",
+    "APPLY_FAILED",
+    "DEPLOYED",
+  ].includes(phase)) {
+    setStage("architecture", "done", "クラウド構成は承認済みです。");
+  }
+
+  if (phase === "REQUIREMENT_DRAFT") {
+    setStage("requirements", "running", "要件定義書は生成済みです。確認して承認してください。");
+    setNextAction("生成された要件定義書を確認し、「要件を承認」を押してください。");
+  } else if (phase === "REQUIREMENT_APPROVED") {
+    setNextAction("次は「設計書を生成」を押してください。");
+  } else if (phase === "DESIGN_DRAFT") {
+    setStage("design", "running", "設計書セットは生成済みです。確認して承認してください。");
+    setNextAction("設計書セットを確認し、「設計を承認」を押してください。");
+  } else if (phase === "DESIGN_APPROVED") {
+    setNextAction("次は「構成案を作成」を押してください。");
+  } else if (phase === "ARCHITECTURE_DRAFT") {
+    setStage("architecture", "running", "GCP構成案は生成済みです。セキュリティ評価または構成承認が必要です。");
+    setNextAction("クラウド構成マップを確認し、「セキュリティ評価」を押してください。");
+  } else if (phase === "SECURITY_REVIEW") {
+    setStage("architecture", "running", "セキュリティ評価済みです。構成を確認して承認してください。");
+    setNextAction("構成とセキュリティ評価を確認し、「構成を承認」を押してください。");
+  } else if (phase === "ARCHITECTURE_APPROVED") {
+    setNextAction("次は「アプリを生成」を押してください。");
+  } else if (phase === "READY_TO_APPLY") {
+    setStage("apply", "running", "Apply待ちです。生成コードと承認済み構成を確認してください。");
+    setNextAction("問題なければ「Applyする」を押してください。");
+  } else if (phase === "APPLYING") {
+    setStage("apply", "running", "Apply実行中です。完了まで編集はロックされます。");
+    setNextAction("Apply完了まで待ってから運用ダッシュボードを確認してください。");
+  } else if (phase === "APPLY_FAILED") {
+    setStage("apply", "blocked", "Applyに失敗しました。最新レスポンスと失敗時ガイドを確認してください。");
+    setNextAction("エラー内容を確認し、「失敗時ガイド」または構成編集で修正してください。");
+  } else if (phase === "DEPLOYED") {
+    setStage("apply", "done", "Applyは完了済みです。");
+    setStage("ops", "done", "運用ダッシュボード、判断履歴、提出材料を確認できます。");
+    setNextAction("クラウド構成マップ、運用ダッシュボード、実行タイムラインを順に確認してください。");
+  }
+}
+
+function statusLabel(status) {
+  return {
+    idle: "未着手",
+    running: "進行中",
+    done: "完了",
+    blocked: "要確認",
+  }[status] || "未着手";
+}
+
+function updateProgress() {
+  const stages = Object.keys(stageState);
+  const doneCount = stages.filter((stage) => stageState[stage] === "done").length;
+  progressMeter.style.width = `${Math.round((doneCount / stages.length) * 100)}%`;
+}
+
+function setNextAction(message) {
+  nextActionView.textContent = message;
+}
+
+function addActivity(message) {
+  if (activityLog.children.length === 1 && activityLog.children[0].textContent === "まだ操作は実行されていません。") {
+    activityLog.replaceChildren();
+  }
+  const item = document.createElement("li");
+  item.textContent = `${new Date().toLocaleTimeString("ja-JP")} ${message}`;
+  activityLog.prepend(item);
+  while (activityLog.children.length > 8) {
+    activityLog.removeChild(activityLog.lastChild);
+  }
+}
+
+function stageForStep(step) {
+  return {
+    "follow-up": "requirements",
+    requirements: "requirements",
+    "approve-requirements": "requirements",
+    designs: "design",
+    "approve-design": "design",
+    architecture: "architecture",
+    security: "architecture",
+    "approve-architecture": "architecture",
+    "target-app": "apply",
+    apply: "apply",
+    ops: "ops",
+    timeline: "ops",
+  }[step] || null;
+}
+
+function stepStartMessage(step) {
+  return {
+    "follow-up": "追加質問を作成しています。",
+    requirements: "要件定義書を作成しています。",
+    "approve-requirements": "要件承認を記録しています。",
+    designs: "設計書セットを生成しています。",
+    "approve-design": "設計承認を記録しています。",
+    architecture: "GCP構成案を作成しています。",
+    security: "クラウド構成のセキュリティ評価を実行しています。",
+    "approve-architecture": "構成承認を記録しています。",
+    "target-app": "サンプルアプリのコードを生成しています。",
+    apply: "承認済み構成をApplyしています。",
+    ops: "運用ダッシュボードを更新しています。",
+    timeline: "エージェントの判断履歴を読み込んでいます。",
+  }[step] || "操作を実行しています。";
+}
+
+function stepDoneMessage(step) {
+  return {
+    "follow-up": "追加質問を作成しました。",
+    requirements: "要件定義書を作成しました。",
+    "approve-requirements": "要件を承認しました。",
+    designs: "設計書セットを生成しました。",
+    "approve-design": "設計を承認しました。",
+    architecture: "GCP構成案を作成しました。",
+    security: "セキュリティ評価を完了しました。",
+    "approve-architecture": "クラウド構成を承認しました。",
+    "target-app": "サンプルアプリのコードを生成しました。",
+    apply: "Applyを完了しました。",
+    ops: "運用ダッシュボードを更新しました。",
+    timeline: "エージェントの判断履歴を表示しました。",
+  }[step] || "操作が完了しました。";
+}
+
+function markStepFailed(step, error) {
+  const stage = stageForStep(step);
+  const message = error?.message || "原因不明のエラー";
+  if (stage) {
+    setStage(stage, "blocked", `${stageLabels[stage]}で停止しました: ${message}`);
+  }
+  setNextAction("最新レスポンスのエラー内容を確認し、必要なら順番を戻して再実行してください。");
+  addActivity(`${stepStartMessage(step).replace("しています。", "")}に失敗しました: ${message}`);
+}
+
+function summarizeDemoResult(result) {
+  const documentCount = Array.isArray(result.design_documents) ? result.design_documents.length : 0;
+  const nodeCount = result.architecture?.spec?.nodes?.length || 0;
+  const fileCount = result.target_app?.files?.length || 0;
+  const timelineCount = Array.isArray(result.timeline) ? result.timeline.length : 0;
+  addActivity(`成果物: 設計書 ${documentCount} 件、構成ノード ${nodeCount} 件、生成ファイル ${fileCount} 件、判断履歴 ${timelineCount} 件。`);
 }
 
 function titleize(value) {
@@ -985,6 +1329,8 @@ function renderError(error) {
     guidance.push("サーバ状態がリセットされた可能性があります。デモ一括実行で審査用ワークスペースを再作成してください。");
   }
   serverStatus.textContent = guidance[0] || "操作に失敗しました";
+  setNextAction(guidance[0] || "最新レスポンスのエラー内容を確認し、必要な操作をもう一度実行してください。");
+  addActivity(`エラー: ${error.message}`);
   output.textContent = JSON.stringify(
     {
       error: {
