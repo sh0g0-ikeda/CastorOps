@@ -206,6 +206,31 @@ class DemoWebServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(failure_demo_status, 200)
         self.assertTrue(json.loads(failure_demo_body.decode("utf-8"))["data"]["recovery_demo"]["kept_previous_revision"])
 
+    async def test_judging_demo_route_rebuilds_complete_workspace(self) -> None:
+        app = DemoWebApp(build_demo_facade(), target_project_id="demo-gcp-project")
+
+        status, _, body = await app.handle(
+            method="POST",
+            raw_path="/api/demo/run",
+            body=json.dumps(
+                {
+                    "name": "",
+                    "idea": " ",
+                    "target_project_id": "",
+                    "repo_url": "",
+                }
+            ).encode("utf-8"),
+        )
+        payload = json.loads(body.decode("utf-8"))["data"]
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["project"]["phase"], "DEPLOYED")
+        self.assertEqual(payload["readiness"]["cloud_run_evidence"]["runtime_product"], "Cloud Run")
+        self.assertEqual(payload["readiness"]["adapter_inventory"]["cloud_build_apply"]["mode"], "demo_adapter")
+        self.assertTrue(payload["target_app"]["files"])
+        self.assertTrue(payload["timeline"])
+        self.assertTrue(payload["optional_delivery"]["github_demo"]["draft_pr"]["created"])
+
     async def test_invalid_json_returns_validation_error(self) -> None:
         app = DemoWebApp(build_demo_facade(), target_project_id="demo-gcp-project")
 

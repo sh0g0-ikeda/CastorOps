@@ -48,6 +48,8 @@ class DemoWebApp:
         request_body = _parse_json_body(body)
         if method == "GET" and path_parts == ("api", "health"):
             return _api_response(ApiResponse.ok({"status": "ok"}))
+        if method == "POST" and path_parts == ("api", "demo", "run"):
+            return await self._run_demo_flow(_require_object(request_body))
         if method == "POST" and path_parts == ("api", "projects"):
             payload = _require_object(request_body)
             response = await self._facade.create_project(
@@ -249,6 +251,168 @@ class DemoWebApp:
             return _api_response(await self._facade.timeline(project_id=project_id))
         return _json_error(HTTPStatus.NOT_FOUND, "NOT_FOUND", "route not found")
 
+    async def _run_demo_flow(self, payload: dict[str, Any]) -> tuple[int, str, bytes]:
+        """Run the full judging demo from the backend to avoid fragile client step chains."""
+
+        name = _demo_string(payload, "name", "Support Desk Demo")
+        idea = _demo_string(
+            payload,
+            "idea",
+            "Build a support desk API that stores tickets, exposes health checks, and can be deployed on Cloud Run.",
+        )
+        target_project_id = _demo_string(payload, "target_project_id", self._target_project_id)
+        repo_url = _demo_string(payload, "repo_url", "https://github.com/sh0g0-ikeda/CastorOps")
+        failure_text = _demo_string(payload, "failure_text", "Cloud Run deploy failed: permission denied")
+
+        project = _expect_ok(
+            await self._facade.create_project(name=name, idea=idea),
+            "create_project",
+        )
+        project_id = project["id"]
+        follow_up = _expect_ok(
+            await self._facade.generate_follow_up_questions(project_id=project_id, form_responses={}),
+            "follow_up",
+        )
+        requirements = _expect_ok(
+            await self._facade.generate_requirements(project_id=project_id),
+            "requirements",
+        )
+        requirements_approval = _expect_ok(
+            await self._facade.decide_approval(
+                project_id=project_id,
+                gate="requirements",
+                decision="approved",
+                rationale="Approved by backend judging demo flow",
+                snapshot=requirements,
+            ),
+            "approve_requirements",
+        )
+        designs = _expect_ok(
+            await self._facade.generate_design_set(project_id=project_id),
+            "designs",
+        )
+        design_approval = _expect_ok(
+            await self._facade.decide_approval(
+                project_id=project_id,
+                gate="design",
+                decision="approved",
+                rationale="Approved by backend judging demo flow",
+                snapshot={"documents": designs},
+            ),
+            "approve_design",
+        )
+        architecture = _expect_ok(
+            await self._facade.propose_architecture(
+                project_id=project_id,
+                target_project_id=target_project_id,
+            ),
+            "architecture",
+        )
+        security = _expect_ok(
+            await self._facade.evaluate_security(project_id=project_id),
+            "security",
+        )
+        architecture_approval = _expect_ok(
+            await self._facade.decide_approval(
+                project_id=project_id,
+                gate="architecture",
+                decision="approved",
+                rationale="Approved by backend judging demo flow",
+                snapshot={"architecture": architecture, "security": security},
+            ),
+            "approve_architecture",
+        )
+        target_app = _expect_ok(
+            await self._facade.generate_target_app(
+                project_id=project_id,
+                app_name="Support Desk API",
+                collection_name="support_tickets",
+                fields=("subject", "message", "email", "priority"),
+                env_vars=("GEMINI_API_KEY", "LOG_LEVEL"),
+            ),
+            "target_app",
+        )
+        deployment = _expect_ok(
+            await self._facade.apply_latest_architecture(project_id=project_id),
+            "apply",
+        )
+        project = _expect_ok(
+            await self._facade.get_project(project_id=project_id),
+            "refresh_project",
+        )
+        latest_architecture = _expect_ok(
+            await self._facade.latest_architecture(project_id=project_id),
+            "latest_architecture",
+        )
+        documents = _expect_ok(
+            await self._facade.latest_documents(project_id=project_id),
+            "latest_documents",
+        )
+        latest_target_app = _expect_ok(
+            await self._facade.latest_target_app(project_id=project_id),
+            "latest_target_app",
+        )
+        ops = _expect_ok(await self._facade.ops_overview(project_id=project_id), "ops")
+        timeline = _expect_ok(await self._facade.timeline(project_id=project_id), "timeline")
+        cloud_run = _expect_ok(
+            await self._facade.cloud_run_evidence(project_id=project_id),
+            "cloud_run_evidence",
+        )
+        adapters = _expect_ok(
+            await self._facade.adapter_inventory(project_id=project_id),
+            "adapter_inventory",
+        )
+        submission = _expect_ok(
+            await self._facade.submission_brief(project_id=project_id),
+            "submission_brief",
+        )
+        terraform = _expect_ok(
+            await self._facade.terraform_preview(project_id=project_id),
+            "terraform_preview",
+        )
+        github = _expect_ok(
+            await self._facade.github_demo_flow(project_id=project_id, repo_url=repo_url),
+            "github_demo",
+        )
+        failure_demo = _expect_ok(
+            await self._facade.apply_failure_demo(project_id=project_id, error_text=failure_text),
+            "failure_demo",
+        )
+        return _api_response(
+            ApiResponse.ok(
+                {
+                    "project_id": project_id,
+                    "project": project,
+                    "follow_up": follow_up,
+                    "requirements": requirements,
+                    "approvals": {
+                        "requirements": requirements_approval,
+                        "design": design_approval,
+                        "architecture": architecture_approval,
+                    },
+                    "design_documents": documents,
+                    "architecture": latest_architecture,
+                    "security": security,
+                    "target_app": latest_target_app,
+                    "target_app_generation": target_app,
+                    "deployment": deployment,
+                    "ops": ops,
+                    "timeline": timeline,
+                    "readiness": {
+                        "submission_brief": submission,
+                        "cloud_run_evidence": cloud_run,
+                        "adapter_inventory": adapters,
+                        "failure_recovery_demo": failure_demo,
+                    },
+                    "optional_delivery": {
+                        "terraform_preview": terraform,
+                        "github_demo": github,
+                    },
+                    "recovery_hint": "If a Cloud Run instance restarts and demo state disappears, run this endpoint again to rebuild a complete judging workspace.",
+                }
+            )
+        )
+
 
 def create_demo_server(
     *,
@@ -298,6 +462,19 @@ def _api_response(response: ApiResponse) -> tuple[int, str, bytes]:
     body = response.to_dict()
     status = HTTPStatus.OK if body["error"] is None else _status_for_error_code(body["error"]["code"])
     return int(status), "application/json; charset=utf-8", _json_bytes(body)
+
+
+def _expect_ok(response: ApiResponse, step: str) -> Any:
+    body = response.to_dict()
+    if body["error"] is None:
+        return body["data"]
+    raise ValidationAppError(
+        "demo flow failed",
+        {
+            "step": step,
+            "error": body["error"],
+        },
+    )
 
 
 def _status_for_error_code(error_code: str) -> HTTPStatus:
@@ -369,6 +546,13 @@ def _optional_string(payload: dict[str, Any], field_name: str, default: str) -> 
     if not isinstance(value, str) or not value.strip():
         raise ValidationAppError(f"{field_name} must be a non-empty string")
     return value.strip()
+
+
+def _demo_string(payload: dict[str, Any], field_name: str, default: str) -> str:
+    value = payload.get(field_name, default)
+    if not isinstance(value, str):
+        raise ValidationAppError(f"{field_name} must be a string")
+    return value.strip() or default
 
 
 def _optional_bool(payload: dict[str, Any], field_name: str, default: bool) -> bool:
