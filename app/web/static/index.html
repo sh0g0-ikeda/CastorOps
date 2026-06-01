@@ -50,6 +50,61 @@
         </dl>
       </section>
 
+      <section class="panel controlCenter">
+        <h2>現在の状況</h2>
+        <p class="panelHelp">エージェントが何を終えたか、次に何を見るべきかをここで確認します。</p>
+        <div class="nextActionBox">
+          <span>次にやること</span>
+          <strong id="nextAction">まず「デモ一括実行」を押すか、作業フローを上から順に進めてください。</strong>
+        </div>
+        <div class="progressWrap" aria-label="全体進捗">
+          <div id="progressMeter" class="progressMeter" style="width: 0%"></div>
+        </div>
+        <div class="statusList">
+          <article class="statusItem" data-stage="requirements">
+            <span class="stateBadge">未着手</span>
+            <div>
+              <strong>要件定義</strong>
+              <p>追加質問と要件定義書を作ります。</p>
+            </div>
+          </article>
+          <article class="statusItem" data-stage="design">
+            <span class="stateBadge">未着手</span>
+            <div>
+              <strong>設計書</strong>
+              <p>設計書セットを生成し、承認します。</p>
+            </div>
+          </article>
+          <article class="statusItem" data-stage="architecture">
+            <span class="stateBadge">未着手</span>
+            <div>
+              <strong>クラウド構成</strong>
+              <p>GCP構成、影響、セキュリティを確認します。</p>
+            </div>
+          </article>
+          <article class="statusItem" data-stage="apply">
+            <span class="stateBadge">未着手</span>
+            <div>
+              <strong>アプリ生成/Apply</strong>
+              <p>生成コードとApply結果を確認します。</p>
+            </div>
+          </article>
+          <article class="statusItem" data-stage="ops">
+            <span class="stateBadge">未着手</span>
+            <div>
+              <strong>運用確認</strong>
+              <p>ダッシュボード、判断履歴、提出材料を確認します。</p>
+            </div>
+          </article>
+        </div>
+        <div class="activityBox">
+          <h3>実行ログ</h3>
+          <ol id="activityLog">
+            <li>まだ操作は実行されていません。</li>
+          </ol>
+        </div>
+      </section>
+
       <section class="panel steps">
         <h2>作業フロー</h2>
         <p class="panelHelp">各行がひとつの成果物です。「作成 → 確認 → 承認」の対応をこの順で見ます。</p>

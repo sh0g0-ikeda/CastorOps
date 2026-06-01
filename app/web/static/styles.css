@@ -96,6 +96,7 @@ body.applying .lockStatus {
 }
 
 .intake,
+.controlCenter,
 .steps {
   grid-column: 1;
 }
@@ -225,6 +226,133 @@ button:disabled {
   font-family: "Cascadia Mono", Consolas, monospace;
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+.nextActionBox {
+  background: #eef4ff;
+  border: 1px solid #bad0f4;
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 12px;
+}
+
+.nextActionBox span {
+  color: #52616f;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.nextActionBox strong {
+  color: #10202f;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.progressWrap {
+  background: #e5eaf0;
+  border-radius: 999px;
+  height: 10px;
+  margin: 10px 0 14px;
+  overflow: hidden;
+}
+
+.progressMeter {
+  background: #1e8e3e;
+  height: 100%;
+  transition: width 0.25s ease;
+}
+
+.statusList {
+  display: grid;
+  gap: 8px;
+}
+
+.statusItem {
+  align-items: flex-start;
+  border: 1px solid #e1e8ef;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 74px 1fr;
+  padding: 10px;
+}
+
+.statusItem strong {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 3px;
+}
+
+.statusItem p {
+  color: #52616f;
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.stateBadge {
+  background: #edf1f5;
+  border-radius: 999px;
+  color: #52616f;
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 5px 8px;
+  text-align: center;
+}
+
+.statusItem.isRunning {
+  background: #fff8e6;
+  border-color: #f1ca6b;
+}
+
+.statusItem.isRunning .stateBadge {
+  background: #b06000;
+  color: #ffffff;
+}
+
+.statusItem.isDone {
+  background: #edf7ee;
+  border-color: #b8dfbd;
+}
+
+.statusItem.isDone .stateBadge {
+  background: #1e8e3e;
+  color: #ffffff;
+}
+
+.statusItem.isBlocked {
+  background: #fceeee;
+  border-color: #efb8b4;
+}
+
+.statusItem.isBlocked .stateBadge {
+  background: #b3261e;
+  color: #ffffff;
+}
+
+.activityBox {
+  border-top: 1px solid #e5eaf0;
+  margin-top: 14px;
+  padding-top: 12px;
+}
+
+.activityBox h3 {
+  margin-top: 0;
+}
+
+.activityBox ol {
+  color: #3e4c59;
+  display: grid;
+  font-size: 12px;
+  gap: 7px;
+  line-height: 1.45;
+  margin: 0;
+  max-height: 180px;
+  overflow: auto;
+  padding-left: 20px;
 }
 
 .workflowList {
@@ -499,6 +627,7 @@ pre {
   }
 
   .intake,
+  .controlCenter,
   .steps,
   .architecture,
   .docs,
