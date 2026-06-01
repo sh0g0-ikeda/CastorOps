@@ -192,6 +192,37 @@ class CastorOpsApiFacade:
             request_id=request_id,
         )
 
+    async def capture_image_requirement(
+        self,
+        *,
+        project_id: str,
+        file_name: str,
+        description: str,
+        request_id: str | None = None,
+    ) -> ApiResponse:
+        if not file_name.strip():
+            return ApiResponse.failed(
+                ValidationAppError("file_name must be a non-empty string"),
+                request_id=request_id,
+            )
+        if not description.strip():
+            return ApiResponse.failed(
+                ValidationAppError("description must be a non-empty string"),
+                request_id=request_id,
+            )
+        return ApiResponse.ok(
+            {
+                "project_id": project_id,
+                "file_name": file_name.strip(),
+                "extracted_requirements": [
+                    "Use the uploaded visual as architecture context.",
+                    f"Captured note: {description.strip()}",
+                ],
+                "mode": "demo_image_artifact",
+            },
+            request_id=request_id,
+        )
+
     async def generate_follow_up_questions(
         self,
         *,
@@ -550,6 +581,158 @@ class CastorOpsApiFacade:
             request_id=request_id,
         )
 
+    async def evaluate_security_loop(
+        self,
+        *,
+        project_id: str,
+        rounds: int = 2,
+        request_id: str | None = None,
+    ) -> ApiResponse:
+        if rounds < 1 or rounds > 3:
+            return ApiResponse.failed(
+                ValidationAppError("rounds must be between 1 and 3"),
+                request_id=request_id,
+            )
+        completed_rounds = []
+        try:
+            for round_index in range(rounds):
+                result = await self._security_workflow.evaluate_latest_architecture(project_id=project_id)
+                await self._record_agent_run(
+                    run=result.run,
+                    action="evaluated_security",
+                )
+                completed_rounds.append(
+                    {
+                        "round": round_index + 1,
+                        "run_id": result.run.id,
+                        "run_status": result.run.status.value,
+                        "findings": len(result.findings),
+                        "critical_count": result.critical_count,
+                        "conditional_reproposal": result.critical_count > 0,
+                    }
+                )
+                if result.critical_count == 0:
+                    break
+        except AppError as exc:
+            return ApiResponse.failed(exc, request_id=request_id)
+        return ApiResponse.ok(
+            {
+                "rounds": completed_rounds,
+                "completed": True,
+                "stopped_reason": "no_critical_findings"
+                if completed_rounds and completed_rounds[-1]["critical_count"] == 0
+                else "round_limit",
+            },
+            request_id=request_id,
+        )
+
+    async def add_architecture_node(
+        self,
+        *,
+        project_id: str,
+        node_id: str,
+        node_type: str,
+        name: str,
+        parameters: dict[str, Any],
+        change_reason: str,
+        request_id: str | None = None,
+    ) -> ApiResponse:
+        if self._architecture_service is None:
+            return ApiResponse.failed(
+                ValidationAppError("architecture service is not configured"),
+                request_id=request_id,
+            )
+        try:
+            proposal = await self._architecture_service.create_added_node_proposal(
+                project_id=project_id,
+                node_id=node_id,
+                node_type=node_type,
+                name=name,
+                parameters=parameters,
+                change_reason=change_reason,
+            )
+        except AppError as exc:
+            return ApiResponse.failed(exc, request_id=request_id)
+        return ApiResponse.ok(
+            {
+                "architecture_id": proposal.id,
+                "version": proposal.version,
+                "status": proposal.status.value,
+                "node_id": node_id,
+            },
+            request_id=request_id,
+        )
+
+    async def add_architecture_edge(
+        self,
+        *,
+        project_id: str,
+        edge_id: str,
+        from_node: str,
+        to_node: str,
+        edge_type: str,
+        description: str,
+        change_reason: str,
+        request_id: str | None = None,
+    ) -> ApiResponse:
+        if self._architecture_service is None:
+            return ApiResponse.failed(
+                ValidationAppError("architecture service is not configured"),
+                request_id=request_id,
+            )
+        try:
+            proposal = await self._architecture_service.create_added_edge_proposal(
+                project_id=project_id,
+                edge_id=edge_id,
+                from_node=from_node,
+                to_node=to_node,
+                edge_type=edge_type,
+                description=description,
+                change_reason=change_reason,
+            )
+        except AppError as exc:
+            return ApiResponse.failed(exc, request_id=request_id)
+        return ApiResponse.ok(
+            {
+                "architecture_id": proposal.id,
+                "version": proposal.version,
+                "status": proposal.status.value,
+                "edge_id": edge_id,
+            },
+            request_id=request_id,
+        )
+
+    async def delete_architecture_edge(
+        self,
+        *,
+        project_id: str,
+        edge_id: str,
+        change_reason: str,
+        request_id: str | None = None,
+    ) -> ApiResponse:
+        if self._architecture_service is None:
+            return ApiResponse.failed(
+                ValidationAppError("architecture service is not configured"),
+                request_id=request_id,
+            )
+        try:
+            proposal = await self._architecture_service.create_deleted_edge_proposal(
+                project_id=project_id,
+                edge_id=edge_id,
+                change_reason=change_reason,
+            )
+        except AppError as exc:
+            return ApiResponse.failed(exc, request_id=request_id)
+        return ApiResponse.ok(
+            {
+                "architecture_id": proposal.id,
+                "version": proposal.version,
+                "status": proposal.status.value,
+                "edge_id": edge_id,
+            },
+            request_id=request_id,
+        )
+
     async def apply_latest_architecture(
         self,
         *,
@@ -575,6 +758,65 @@ class CastorOpsApiFacade:
             request_id=request_id,
         )
 
+    async def apply_failure_guidance(
+        self,
+        *,
+        project_id: str,
+        error_text: str,
+        request_id: str | None = None,
+    ) -> ApiResponse:
+        if not error_text.strip():
+            return ApiResponse.failed(
+                ValidationAppError("error_text must be a non-empty string"),
+                request_id=request_id,
+            )
+        try:
+            architecture = await self._architecture_service.latest_payload(project_id) if self._architecture_service else None
+        except AppError:
+            architecture = None
+        return ApiResponse.ok(
+            _apply_failure_guidance_payload(error_text=error_text, architecture=architecture),
+            request_id=request_id,
+        )
+
+    async def terraform_preview(self, *, project_id: str, request_id: str | None = None) -> ApiResponse:
+        if self._architecture_service is None:
+            return ApiResponse.failed(
+                ValidationAppError("architecture service is not configured"),
+                request_id=request_id,
+            )
+        try:
+            architecture = await self._architecture_service.latest_payload(project_id)
+        except AppError as exc:
+            return ApiResponse.failed(exc, request_id=request_id)
+        return ApiResponse.ok(_terraform_preview_payload(architecture), request_id=request_id)
+
+    async def github_demo_flow(
+        self,
+        *,
+        project_id: str,
+        repo_url: str,
+        request_id: str | None = None,
+    ) -> ApiResponse:
+        try:
+            latest_package = await self._code_service.latest_payload(project_id) if self._code_service else None
+        except AppError:
+            latest_package = None
+        try:
+            latest_architecture = await self._architecture_service.latest_payload(project_id) if self._architecture_service else None
+        except AppError:
+            latest_architecture = None
+        try:
+            payload = _github_demo_payload(
+                project_id=project_id,
+                repo_url=repo_url,
+                latest_package=latest_package,
+                latest_architecture=latest_architecture,
+            )
+        except AppError as exc:
+            return ApiResponse.failed(exc, request_id=request_id)
+        return ApiResponse.ok(payload, request_id=request_id)
+
     async def generate_target_app(
         self,
         *,
@@ -582,6 +824,7 @@ class CastorOpsApiFacade:
         app_name: str,
         collection_name: str = "inquiries",
         fields: tuple[str, ...] = ("subject", "message", "email"),
+        env_vars: tuple[str, ...] = (),
         request_id: str | None = None,
     ) -> ApiResponse:
         if self._code_service is None:
@@ -595,6 +838,7 @@ class CastorOpsApiFacade:
                 app_name=app_name,
                 collection_name=collection_name,
                 fields=fields,
+                env_vars=env_vars,
             )
         except AppError as exc:
             return ApiResponse.failed(exc, request_id=request_id)
@@ -615,6 +859,18 @@ class CastorOpsApiFacade:
             )
         try:
             payload = await self._code_service.latest_payload(project_id)
+        except AppError as exc:
+            return ApiResponse.failed(exc, request_id=request_id)
+        return ApiResponse.ok(payload, request_id=request_id)
+
+    async def review_latest_target_app(self, *, project_id: str, request_id: str | None = None) -> ApiResponse:
+        if self._code_service is None:
+            return ApiResponse.failed(
+                ValidationAppError("code service is not configured"),
+                request_id=request_id,
+            )
+        try:
+            payload = await self._code_service.review_latest(project_id)
         except AppError as exc:
             return ApiResponse.failed(exc, request_id=request_id)
         return ApiResponse.ok(payload, request_id=request_id)
@@ -684,3 +940,124 @@ def _parameter_patch_from_change_request(message: str) -> dict[str, Any]:
             {"supported_examples": ["make it public", "use 1Gi memory", "lower cost"]},
         )
     return patch
+
+
+def _apply_failure_guidance_payload(
+    *,
+    error_text: str,
+    architecture: dict[str, Any] | None,
+) -> dict[str, Any]:
+    normalized = error_text.lower()
+    if "permission" in normalized or "iam" in normalized or "forbidden" in normalized:
+        likely_cause = "Insufficient IAM permission for Cloud Build or Cloud Run deployment."
+        repair_steps = [
+            "Confirm the Cloud Build service account has deploy permission for Cloud Run.",
+            "Confirm Artifact Registry push permission is granted.",
+            "Re-run apply after approval.",
+        ]
+    elif "image" in normalized or "artifact" in normalized:
+        likely_cause = "Container image build or push failed."
+        repair_steps = [
+            "Run the generated tests locally.",
+            "Rebuild the container image.",
+            "Check Artifact Registry repository and region.",
+        ]
+    else:
+        likely_cause = "Cloud Build apply failed before deployment completed."
+        repair_steps = [
+            "Open the Cloud Build log for the failed step.",
+            "Keep the previous deployed revision serving traffic.",
+            "Apply the corrected architecture draft after approval.",
+        ]
+    rollback_candidates = []
+    if architecture is not None:
+        rollback_candidates.append(
+            {
+                "architecture_id": architecture["id"],
+                "version": architecture["version"],
+                "strategy": "Keep previous Cloud Run revision and re-apply this architecture after fixing the error.",
+            }
+        )
+    return {
+        "likely_cause": likely_cause,
+        "repair_steps": repair_steps,
+        "rollback_candidates": rollback_candidates,
+    }
+
+
+def _terraform_preview_payload(architecture: dict[str, Any]) -> dict[str, Any]:
+    resources = []
+    for node in architecture["spec"]["nodes"]:
+        resource_name = node["id"].replace("-", "_")
+        if node["type"] == "cloud_run":
+            resources.append(
+                "\n".join(
+                    [
+                        f'resource "google_cloud_run_v2_service" "{resource_name}" {{',
+                        f'  name     = "{node["id"]}"',
+                        f'  location = "{architecture["spec"]["region"]}"',
+                        "}",
+                    ]
+                )
+            )
+        elif node["type"] == "firestore":
+            resources.append(
+                "\n".join(
+                    [
+                        f'resource "google_firestore_database" "{resource_name}" {{',
+                        '  name        = "(default)"',
+                        f'  location_id = "{architecture["spec"]["region"]}"',
+                        '  type        = "FIRESTORE_NATIVE"',
+                        "}",
+                    ]
+                )
+            )
+        else:
+            resources.append(f'# {node["type"]} "{node["id"]}" is represented in the architecture map.')
+    return {
+        "mode": "preview_only",
+        "hcl": "\n\n".join(resources),
+        "plan_summary": {
+            "add": len(architecture["spec"]["nodes"]),
+            "change": 0,
+            "destroy": 0,
+        },
+        "warning": "Terraform is a COULD-level preview in this demo. Cloud Build + gcloud remains the executable apply path.",
+    }
+
+
+def _github_demo_payload(
+    *,
+    project_id: str,
+    repo_url: str,
+    latest_package: dict[str, Any] | None,
+    latest_architecture: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if not repo_url.strip() or "github.com" not in repo_url:
+        raise ValidationAppError("repo_url must be a GitHub repository URL")
+    normalized_url = repo_url.strip().rstrip("/")
+    branch = f"castorops/{project_id[:8]}-demo"
+    files = latest_package["files"] if latest_package else []
+    detected_paths = [file_payload["path"] for file_payload in files]
+    return {
+        "repository": {
+            "url": normalized_url,
+            "read": True,
+            "detected_files": detected_paths or ["README.md", "Dockerfile", "cloudbuild.yaml"],
+        },
+        "branch": {
+            "name": branch,
+            "created": True,
+        },
+        "push": {
+            "pushed": True,
+            "files": detected_paths,
+        },
+        "draft_pr": {
+            "created": True,
+            "url": f"{normalized_url}/pull/castorops-demo",
+            "title": "CastorOps generated deployment package",
+        },
+        "architecture_version": latest_architecture["version"] if latest_architecture else None,
+        "mode": "demo_adapter",
+    }

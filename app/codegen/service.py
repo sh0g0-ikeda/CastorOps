@@ -23,14 +23,17 @@ class TargetAppCodeService:
         app_name: str,
         collection_name: str = "inquiries",
         fields: tuple[str, ...] = ("subject", "message", "email"),
+        env_vars: tuple[str, ...] = (),
     ) -> CodeGenerationResult:
         normalized_app_name = _safe_app_name(app_name)
         normalized_collection = _safe_identifier(collection_name, "collection_name")
         normalized_fields = tuple(_safe_identifier(field, "field") for field in fields)
+        normalized_env_vars = tuple(_safe_env_name(env_var) for env_var in env_vars)
         files = _render_files(
             app_name=normalized_app_name,
             collection_name=normalized_collection,
             fields=normalized_fields,
+            env_vars=normalized_env_vars,
         )
         result = CodeGenerationResult.create(
             project_id=project_id,
@@ -49,19 +52,62 @@ class TargetAppCodeService:
         result = await self._repository.latest(project_id)
         return _result_payload(result)
 
+    async def review_latest(self, project_id: str) -> dict[str, Any]:
+        result = await self._repository.latest(project_id)
+        findings = []
+        paths = {generated_file.path for generated_file in result.files}
+        if "tests/test_health.py" not in paths:
+            findings.append(
+                {
+                    "severity": "warning",
+                    "message": "No health check test was generated.",
+                    "suggestion": "Add a test that exercises /healthz before deployment.",
+                }
+            )
+        if not any(generated_file.path == "Dockerfile" for generated_file in result.files):
+            findings.append(
+                {
+                    "severity": "critical",
+                    "message": "No Dockerfile was generated.",
+                    "suggestion": "Cloud Run deployment requires a container image build definition.",
+                }
+            )
+        if not findings:
+            findings.append(
+                {
+                    "severity": "info",
+                    "message": "Generated package includes Dockerfile, tests, and Cloud Build pipeline.",
+                    "suggestion": "Run the generated test step before deploying to Cloud Run.",
+                }
+            )
+        return {
+            "package_id": result.id,
+            "app_name": result.app_name,
+            "findings": findings,
+            "passed": not any(item["severity"] == "critical" for item in findings),
+        }
+
 
 def _render_files(
     *,
     app_name: str,
     collection_name: str,
     fields: tuple[str, ...],
+    env_vars: tuple[str, ...],
 ) -> tuple[GeneratedFile, ...]:
     field_defaults = ", ".join(f'"{field}": ""' for field in fields)
     required_fields = ", ".join(f'"{field}"' for field in fields)
+    env_markdown = "\n".join(f"- `{env_var}`" for env_var in env_vars) or "- None"
+    env_python = ", ".join(f'"{env_var}"' for env_var in env_vars)
     return (
         GeneratedFile(
             path="README.md",
-            content=f"# {app_name}\n\nA Cloud Run-ready inquiry management API.\n",
+            content=(
+                f"# {app_name}\n\n"
+                "A Cloud Run-ready inquiry management API.\n\n"
+                "## Environment Variables\n"
+                f"{env_markdown}\n"
+            ),
         ),
         GeneratedFile(
             path="requirements.txt",
@@ -86,6 +132,7 @@ def _render_files(
                 f'app = FastAPI(title="{app_name}")\n'
                 f'COLLECTION_NAME = "{collection_name}"\n'
                 f"REQUIRED_FIELDS = {{{required_fields}}}\n"
+                f"ENVIRONMENT_VARIABLES = [{env_python}]\n"
                 "STORE = []\n\n"
                 "class Inquiry(BaseModel):\n"
                 "    payload: dict[str, str]\n\n"
@@ -164,6 +211,15 @@ def _safe_identifier(value: str, field_name: str) -> str:
     normalized = value.strip().replace("-", "_")
     if not all(ch.islower() or ch.isdigit() or ch == "_" for ch in normalized):
         raise ValidationAppError(f"{field_name} must use lowercase letters, digits, or _")
+    return normalized
+
+
+def _safe_env_name(value: str) -> str:
+    normalized = value.strip().upper()
+    if not normalized:
+        raise ValidationAppError("env var name must not be empty")
+    if not all(ch.isupper() or ch.isdigit() or ch == "_" for ch in normalized):
+        raise ValidationAppError("env var name must use uppercase letters, digits, or _")
     return normalized
 
 

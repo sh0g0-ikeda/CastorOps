@@ -110,6 +110,68 @@
           </label>
           <button type="submit">Re-propose From Chat</button>
         </form>
+        <form id="nodeAddForm" class="nodeEditor">
+          <h3>Node Palette</h3>
+          <label>
+            New node ID
+            <input id="newNodeId" value="secrets">
+          </label>
+          <label>
+            Node type
+            <select id="newNodeType">
+              <option value="secret_manager">Secret Manager</option>
+              <option value="cloud_storage">Cloud Storage</option>
+              <option value="cloud_logging">Cloud Logging</option>
+              <option value="cloud_monitoring">Cloud Monitoring</option>
+              <option value="artifact_registry">Artifact Registry</option>
+              <option value="iam_sa">IAM Service Account</option>
+              <option value="external">External</option>
+            </select>
+          </label>
+          <label>
+            Display name
+            <input id="newNodeName" value="Runtime Secrets">
+          </label>
+          <label>
+            Parameters JSON
+            <textarea id="newNodeParameters">{"secret_names":["GEMINI_API_KEY"]}</textarea>
+          </label>
+          <button type="submit">Add Node Draft</button>
+        </form>
+        <form id="edgeEditForm" class="nodeEditor">
+          <h3>Edge Editor</h3>
+          <label>
+            Edge ID
+            <input id="edgeId" value="backend-secrets">
+          </label>
+          <label>
+            From node
+            <input id="edgeFrom" value="backend">
+          </label>
+          <label>
+            To node
+            <input id="edgeTo" value="secrets">
+          </label>
+          <label>
+            Edge type
+            <select id="edgeType">
+              <option value="secret_read">Secret read</option>
+              <option value="http">HTTP</option>
+              <option value="db_rw">DB read/write</option>
+              <option value="log_output">Log output</option>
+              <option value="image_pull">Image pull</option>
+              <option value="iam_binding">IAM binding</option>
+            </select>
+          </label>
+          <label>
+            Description
+            <input id="edgeDescription" value="Backend reads runtime secrets.">
+          </label>
+          <div class="buttonRow">
+            <button type="submit">Add Edge Draft</button>
+            <button type="button" id="deleteEdgeButton" class="dangerButton">Delete Edge</button>
+          </div>
+        </form>
       </section>
 
       <section class="panel docs">
@@ -119,12 +181,54 @@
 
       <section class="panel target">
         <h2>Target App Package</h2>
+        <form id="targetAppForm" class="nodeEditor">
+          <label>
+            API fields
+            <input id="targetFields" value="subject,message,email,priority">
+          </label>
+          <label>
+            Environment variables
+            <input id="targetEnvVars" value="GEMINI_API_KEY,LOG_LEVEL">
+          </label>
+          <div class="buttonRow">
+            <button type="submit">Generate Customized App</button>
+            <button type="button" id="reviewTargetAppButton" class="secondaryButton">AI Review</button>
+          </div>
+        </form>
         <div id="targetFiles" class="documentList empty">Generate the target app to inspect files here.</div>
       </section>
 
       <section class="panel ops">
         <h2>Ops Dashboard</h2>
         <div id="opsDashboard" class="dashboard empty">Run the pipeline to populate ops sections.</div>
+      </section>
+
+      <section class="panel addons">
+        <h2>Optional Delivery Add-ons</h2>
+        <label>
+          Image artifact name
+          <input id="imageArtifactName" value="sketch.png">
+        </label>
+        <label>
+          Image artifact note
+          <input id="imageArtifactNote" value="Hand-drawn sketch shows Cloud Run connected to Firestore and Secret Manager.">
+        </label>
+        <label>
+          GitHub repository URL
+          <input id="githubRepoUrl" value="https://github.com/sh0g0-ikeda/CastorOps">
+        </label>
+        <label>
+          Failed apply error
+          <input id="failureText" value="Cloud Run deploy failed: permission denied">
+        </label>
+        <div class="buttonRow">
+          <button type="button" id="imageRequirementButton">Capture Image Note</button>
+          <button type="button" id="securityLoopButton">Security Multi-round</button>
+          <button type="button" id="terraformPreviewButton">Terraform Preview</button>
+          <button type="button" id="githubDemoButton">GitHub Demo Flow</button>
+          <button type="button" id="failureGuidanceButton">Failure Guidance</button>
+        </div>
+        <div id="addonsPanel" class="documentList empty">Run an optional add-on to inspect the result.</div>
       </section>
 
       <section class="panel timeline">

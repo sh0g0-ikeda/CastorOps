@@ -17,6 +17,7 @@ const designDocs = document.querySelector("#designDocs");
 const targetFiles = document.querySelector("#targetFiles");
 const timelinePanel = document.querySelector("#timelinePanel");
 const impactPanel = document.querySelector("#impactPanel");
+const addonsPanel = document.querySelector("#addonsPanel");
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -88,7 +89,7 @@ async function runStep(step) {
   } else if (step === "approve-architecture") {
     await approveWithModal("architecture");
   } else if (step === "target-app") {
-    await api(`/api/projects/${projectId}/target-app`, { method: "POST", body: "{}" });
+    await generateTargetApp();
     await loadTargetApp();
   } else if (step === "apply") {
     await applyArchitecture();
@@ -144,7 +145,7 @@ async function runDemoFlow() {
   await loadArchitecture();
   await api(`/api/projects/${projectId}/security`, { method: "POST", body: "{}" });
   await approve("architecture");
-  await api(`/api/projects/${projectId}/target-app`, { method: "POST", body: "{}" });
+  await generateTargetApp();
   await loadTargetApp();
   setApplyLock(true);
   try {
@@ -185,6 +186,37 @@ function renderArchitecture(architecture) {
     item.appendChild(selectButton);
     architectureMap.appendChild(item);
   }
+  for (const edge of architecture.spec.edges) {
+    const item = document.createElement("article");
+    item.className = "edge";
+    appendText(item, "strong", edge.id);
+    appendText(item, "span", `${edge.from_node} -> ${edge.to_node}`);
+    appendText(item, "span", `Type: ${edge.type}`);
+    appendText(item, "span", edge.description);
+    architectureMap.appendChild(item);
+  }
+}
+
+async function runSecurityLoop() {
+  const projectId = await requireProject();
+  const result = await api(`/api/projects/${projectId}/security/loop`, {
+    method: "POST",
+    body: JSON.stringify({ rounds: 2 }),
+  });
+  renderAddonResult("Security Multi-round", result);
+  await loadTimeline();
+}
+
+async function captureImageRequirement() {
+  const projectId = await requireProject();
+  const result = await api(`/api/projects/${projectId}/requirements/image-artifact`, {
+    method: "POST",
+    body: JSON.stringify({
+      file_name: document.querySelector("#imageArtifactName").value,
+      description: document.querySelector("#imageArtifactNote").value,
+    }),
+  });
+  renderAddonResult("Image Requirement Artifact", result);
 }
 
 function selectNode(node) {
@@ -301,6 +333,81 @@ async function reviseFromChat(event) {
   await loadArchitecture();
 }
 
+async function addNode(event) {
+  event.preventDefault();
+  const projectId = await requireProject();
+  const result = await api(`/api/projects/${projectId}/architecture/add-node`, {
+    method: "POST",
+    body: JSON.stringify({
+      node_id: document.querySelector("#newNodeId").value,
+      node_type: document.querySelector("#newNodeType").value,
+      name: document.querySelector("#newNodeName").value,
+      parameters: parseJsonObject(document.querySelector("#newNodeParameters").value),
+      change_reason: "Added node from architecture palette",
+    }),
+  });
+  await confirmAction(
+    "Node Draft Added",
+    [
+      `Draft version: ${result.version}`,
+      `Node: ${result.node_id}`,
+      "Approve the architecture before applying this resource change.",
+    ],
+    "Close",
+  );
+  await loadArchitecture();
+}
+
+async function addEdge(event) {
+  event.preventDefault();
+  const projectId = await requireProject();
+  const result = await api(`/api/projects/${projectId}/architecture/add-edge`, {
+    method: "POST",
+    body: JSON.stringify({
+      edge_id: document.querySelector("#edgeId").value,
+      from_node: document.querySelector("#edgeFrom").value,
+      to_node: document.querySelector("#edgeTo").value,
+      edge_type: document.querySelector("#edgeType").value,
+      description: document.querySelector("#edgeDescription").value,
+      change_reason: "Added edge from architecture editor",
+    }),
+  });
+  await confirmAction(
+    "Edge Draft Added",
+    [
+      `Draft version: ${result.version}`,
+      `Edge: ${result.edge_id}`,
+      "This relationship is now part of the draft architecture map.",
+    ],
+    "Close",
+  );
+  await loadArchitecture();
+}
+
+async function deleteEdge() {
+  const projectId = await requireProject();
+  const edgeId = document.querySelector("#edgeId").value.trim();
+  const confirmed = await confirmAction(
+    "Delete Edge",
+    [
+      `Edge: ${edgeId}`,
+      "This removes the relationship from a new architecture draft version.",
+    ],
+    "Delete Edge",
+  );
+  if (!confirmed) {
+    return;
+  }
+  await api(`/api/projects/${projectId}/architecture/delete-edge`, {
+    method: "POST",
+    body: JSON.stringify({
+      edge_id: edgeId,
+      change_reason: "Deleted edge from architecture editor",
+    }),
+  });
+  await loadArchitecture();
+}
+
 function nodePatchPayload() {
   return {
     node_id: document.querySelector("#nodeId").value,
@@ -310,6 +417,21 @@ function nodePatchPayload() {
       allow_unauthenticated: document.querySelector("#allowUnauthenticated").checked,
     },
   };
+}
+
+function parseJsonObject(value) {
+  const parsed = JSON.parse(value || "{}");
+  if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
+    throw new Error("Parameters JSON must be an object");
+  }
+  return parsed;
+}
+
+function commaList(value) {
+  return String(value)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function renderImpact(preview) {
@@ -366,6 +488,43 @@ function setApplyLock(locked) {
   for (const element of document.querySelectorAll("#chatChangeForm textarea, #chatChangeForm button")) {
     element.disabled = locked;
   }
+  for (const element of document.querySelectorAll("#nodeAddForm input, #nodeAddForm select, #nodeAddForm textarea, #nodeAddForm button, #edgeEditForm input, #edgeEditForm select, #edgeEditForm button")) {
+    element.disabled = locked;
+  }
+}
+
+async function loadTerraformPreview() {
+  const projectId = await requireProject();
+  const result = await api(`/api/projects/${projectId}/terraform/preview`);
+  renderAddonResult("Terraform Preview", result);
+}
+
+async function runGithubDemo() {
+  const projectId = await requireProject();
+  const result = await api(`/api/projects/${projectId}/github/demo`, {
+    method: "POST",
+    body: JSON.stringify({
+      repo_url: document.querySelector("#githubRepoUrl").value,
+    }),
+  });
+  renderAddonResult("GitHub Demo Flow", result);
+}
+
+async function loadFailureGuidance() {
+  const projectId = await requireProject();
+  const result = await api(`/api/projects/${projectId}/apply/failure-guidance`, {
+    method: "POST",
+    body: JSON.stringify({
+      error_text: document.querySelector("#failureText").value,
+    }),
+  });
+  renderAddonResult("Apply Failure Guidance", result);
+}
+
+function renderAddonResult(title, result) {
+  addonsPanel.classList.remove("empty");
+  addonsPanel.replaceChildren();
+  addonsPanel.appendChild(renderDocument(title, JSON.stringify(result, null, 2)));
 }
 
 async function loadDocuments() {
@@ -395,6 +554,36 @@ async function loadTargetApp() {
   for (const file of appPackage.files) {
     targetFiles.appendChild(renderDocument(file.path, file.content));
   }
+}
+
+async function generateTargetApp(event) {
+  if (event) {
+    event.preventDefault();
+  }
+  const projectId = await requireProject();
+  await api(`/api/projects/${projectId}/target-app`, {
+    method: "POST",
+    body: JSON.stringify({
+      app_name: "Support Desk API",
+      collection_name: "support_tickets",
+      fields: commaList(document.querySelector("#targetFields").value),
+      env_vars: commaList(document.querySelector("#targetEnvVars").value),
+    }),
+  });
+  await loadTargetApp();
+}
+
+async function reviewTargetApp() {
+  const projectId = await requireProject();
+  const review = await api(`/api/projects/${projectId}/target-app/review`, {
+    method: "POST",
+    body: "{}",
+  });
+  await confirmAction(
+    "AI Code Review",
+    review.findings.map((finding) => `${finding.severity}: ${finding.message} ${finding.suggestion}`),
+    "Close",
+  );
 }
 
 async function loadOps() {
@@ -533,6 +722,16 @@ document.querySelector("#previewNodeButton").addEventListener("click", () => wit
 document.querySelector("#deleteNodeButton").addEventListener("click", () => withBusy(deleteNode));
 document.querySelector("#nodeEditForm").addEventListener("submit", (event) => withBusy(() => saveNodeEdit(event)));
 document.querySelector("#chatChangeForm").addEventListener("submit", (event) => withBusy(() => reviseFromChat(event)));
+document.querySelector("#nodeAddForm").addEventListener("submit", (event) => withBusy(() => addNode(event)));
+document.querySelector("#edgeEditForm").addEventListener("submit", (event) => withBusy(() => addEdge(event)));
+document.querySelector("#deleteEdgeButton").addEventListener("click", () => withBusy(deleteEdge));
+document.querySelector("#targetAppForm").addEventListener("submit", (event) => withBusy(() => generateTargetApp(event)));
+document.querySelector("#reviewTargetAppButton").addEventListener("click", () => withBusy(reviewTargetApp));
+document.querySelector("#imageRequirementButton").addEventListener("click", () => withBusy(captureImageRequirement));
+document.querySelector("#securityLoopButton").addEventListener("click", () => withBusy(runSecurityLoop));
+document.querySelector("#terraformPreviewButton").addEventListener("click", () => withBusy(loadTerraformPreview));
+document.querySelector("#githubDemoButton").addEventListener("click", () => withBusy(runGithubDemo));
+document.querySelector("#failureGuidanceButton").addEventListener("click", () => withBusy(loadFailureGuidance));
 for (const button of document.querySelectorAll("[data-step]")) {
   button.addEventListener("click", () => withBusy(() => runStep(button.dataset.step)));
 }

@@ -319,6 +319,32 @@ class CastorOpsApiFacadeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(chat_response.to_dict()["data"]["changes"]["cpu"], "2")
         self.assertTrue(chat_response.to_dict()["data"]["requires_reapproval"])
 
+        add_node_response = await facade.add_architecture_node(
+            project_id=project_id,
+            node_id="secrets",
+            node_type="secret_manager",
+            name="Runtime Secrets",
+            parameters={"secret_names": ["GEMINI_API_KEY"]},
+            change_reason="Add runtime secrets",
+        )
+        add_edge_response = await facade.add_architecture_edge(
+            project_id=project_id,
+            edge_id="backend-secrets",
+            from_node="backend",
+            to_node="secrets",
+            edge_type="secret_read",
+            description="Backend reads runtime secrets.",
+            change_reason="Connect backend to secrets",
+        )
+        delete_edge_response = await facade.delete_architecture_edge(
+            project_id=project_id,
+            edge_id="backend-secrets",
+            change_reason="Remove secret edge",
+        )
+        self.assertEqual(add_node_response.to_dict()["data"]["node_id"], "secrets")
+        self.assertEqual(add_edge_response.to_dict()["data"]["edge_id"], "backend-secrets")
+        self.assertEqual(delete_edge_response.to_dict()["data"]["edge_id"], "backend-secrets")
+
     async def test_apply_latest_architecture_deploys_after_architecture_approval(self) -> None:
         facade = make_facade()
         create_response = await facade.create_project(
@@ -370,8 +396,10 @@ class CastorOpsApiFacadeTests(unittest.IsolatedAsyncioTestCase):
             app_name="Support Desk API",
             collection_name="support_tickets",
             fields=("subject", "message"),
+            env_vars=("GEMINI_API_KEY",),
         )
         latest_response = await facade.latest_target_app(project_id=project_id)
+        review_response = await facade.review_latest_target_app(project_id=project_id)
 
         self.assertIsNone(response.to_dict()["error"])
         self.assertIn(
@@ -379,6 +407,57 @@ class CastorOpsApiFacadeTests(unittest.IsolatedAsyncioTestCase):
             response.to_dict()["data"]["files"],
         )
         self.assertIn("cloudbuild.yaml", [item["path"] for item in latest_response.to_dict()["data"]["files"]])
+        self.assertTrue(review_response.to_dict()["data"]["passed"])
+
+    async def test_optional_delivery_addons_return_demo_payloads(self) -> None:
+        facade = make_facade()
+        create_response = await facade.create_project(
+            name="Support Desk",
+            idea="support desk app",
+        )
+        project_id = create_response.to_dict()["data"]["id"]
+        await facade.generate_requirements(project_id=project_id)
+        await facade.decide_approval(
+            project_id=project_id,
+            gate="requirements",
+            decision="approved",
+        )
+        await facade.generate_basic_design(project_id=project_id)
+        await facade.decide_approval(
+            project_id=project_id,
+            gate="design",
+            decision="approved",
+        )
+        await facade.propose_architecture(
+            project_id=project_id,
+            target_project_id="demo-gcp-project",
+        )
+        await facade.generate_target_app(
+            project_id=project_id,
+            app_name="Support Desk API",
+        )
+
+        image_response = await facade.capture_image_requirement(
+            project_id=project_id,
+            file_name="sketch.png",
+            description="Cloud Run connected to Firestore",
+        )
+        terraform_response = await facade.terraform_preview(project_id=project_id)
+        github_response = await facade.github_demo_flow(
+            project_id=project_id,
+            repo_url="https://github.com/sh0g0-ikeda/CastorOps",
+        )
+        guidance_response = await facade.apply_failure_guidance(
+            project_id=project_id,
+            error_text="Cloud Run deploy failed: permission denied",
+        )
+        security_loop_response = await facade.evaluate_security_loop(project_id=project_id, rounds=2)
+
+        self.assertEqual(image_response.to_dict()["data"]["mode"], "demo_image_artifact")
+        self.assertEqual(terraform_response.to_dict()["data"]["mode"], "preview_only")
+        self.assertTrue(github_response.to_dict()["data"]["draft_pr"]["created"])
+        self.assertIn("IAM", guidance_response.to_dict()["data"]["likely_cause"])
+        self.assertEqual(security_loop_response.to_dict()["data"]["stopped_reason"], "no_critical_findings")
 
     async def test_ops_overview_returns_dashboard_sections(self) -> None:
         facade = make_facade()

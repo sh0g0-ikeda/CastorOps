@@ -160,6 +160,91 @@ class ArchitectureService:
             gcloud_commands=proposal.gcloud_commands,
         )
 
+    async def create_added_node_proposal(
+        self,
+        *,
+        project_id: str,
+        node_id: str,
+        node_type: str,
+        name: str,
+        parameters: dict[str, Any],
+        change_reason: str,
+    ) -> ArchitectureProposal:
+        proposal = await self._repository.latest(project_id)
+        updated_spec = _proposal_spec_payload(proposal)
+        if any(node["id"] == node_id for node in updated_spec["nodes"]):
+            raise ValidationAppError("architecture node id already exists", {"node_id": node_id})
+        node_payload = _new_node_payload(
+            node_id=node_id,
+            node_type=node_type,
+            name=name,
+            parameters=parameters,
+        )
+        updated_spec["nodes"].append(node_payload)
+        return await self.create_next_proposal(
+            project_id=project_id,
+            spec_payload=updated_spec,
+            rationale_md=_append_change_reason(proposal.rationale_md, change_reason),
+            cloudbuild_yaml=proposal.cloudbuild_yaml,
+            gcloud_commands=proposal.gcloud_commands,
+        )
+
+    async def create_added_edge_proposal(
+        self,
+        *,
+        project_id: str,
+        edge_id: str,
+        from_node: str,
+        to_node: str,
+        edge_type: str,
+        description: str,
+        change_reason: str,
+    ) -> ArchitectureProposal:
+        proposal = await self._repository.latest(project_id)
+        updated_spec = _proposal_spec_payload(proposal)
+        if any(edge["id"] == edge_id for edge in updated_spec["edges"]):
+            raise ValidationAppError("architecture edge id already exists", {"edge_id": edge_id})
+        updated_spec["edges"].append(
+            {
+                "id": edge_id,
+                "from_node": from_node,
+                "to_node": to_node,
+                "type": edge_type,
+                "description": description,
+            }
+        )
+        return await self.create_next_proposal(
+            project_id=project_id,
+            spec_payload=updated_spec,
+            rationale_md=_append_change_reason(proposal.rationale_md, change_reason),
+            cloudbuild_yaml=proposal.cloudbuild_yaml,
+            gcloud_commands=proposal.gcloud_commands,
+        )
+
+    async def create_deleted_edge_proposal(
+        self,
+        *,
+        project_id: str,
+        edge_id: str,
+        change_reason: str,
+    ) -> ArchitectureProposal:
+        proposal = await self._repository.latest(project_id)
+        updated_spec = _proposal_spec_payload(proposal)
+        if not any(edge["id"] == edge_id for edge in updated_spec["edges"]):
+            raise NotFoundAppError("architecture_edge", f"{proposal.id}:{edge_id}")
+        updated_spec["edges"] = [
+            edge
+            for edge in updated_spec["edges"]
+            if edge["id"] != edge_id
+        ]
+        return await self.create_next_proposal(
+            project_id=project_id,
+            spec_payload=updated_spec,
+            rationale_md=_append_change_reason(proposal.rationale_md, change_reason),
+            cloudbuild_yaml=proposal.cloudbuild_yaml,
+            gcloud_commands=proposal.gcloud_commands,
+        )
+
 
 def _node_payload(node: ArchitectureNode) -> dict[str, Any]:
     return {
@@ -252,6 +337,76 @@ def _validate_parameter_value(field_name: str, value: Any) -> Any:
 
 def _patch_requires_confirmation(parameter_patch: dict[str, Any]) -> bool:
     return parameter_patch.get("allow_unauthenticated") is True
+
+
+def _new_node_payload(
+    *,
+    node_id: str,
+    node_type: str,
+    name: str,
+    parameters: dict[str, Any],
+) -> dict[str, Any]:
+    try:
+        normalized_type = ArchitectureNodeType(node_type).value
+    except ValueError as exc:
+        raise ValidationAppError("architecture node type is not supported", {"type": node_type}) from exc
+    defaults = {
+        ArchitectureNodeType.SECRET_MANAGER.value: {
+            "rationale": "Store runtime secrets outside source code.",
+            "cost_band": "low",
+            "security_notes": ["Restrict secret access to the runtime service account."],
+        },
+        ArchitectureNodeType.CLOUD_STORAGE.value: {
+            "rationale": "Store generated artifacts and larger snapshots.",
+            "cost_band": "low",
+            "security_notes": ["Use uniform bucket-level access."],
+        },
+        ArchitectureNodeType.CLOUD_LOGGING.value: {
+            "rationale": "Collect application logs for the Ops Dashboard.",
+            "cost_band": "low",
+            "security_notes": ["Mask secrets before writing logs."],
+        },
+        ArchitectureNodeType.CLOUD_MONITORING.value: {
+            "rationale": "Track service health, latency, and error rates.",
+            "cost_band": "low",
+            "security_notes": ["Keep alert channels scoped to the project team."],
+        },
+        ArchitectureNodeType.ARTIFACT_REGISTRY.value: {
+            "rationale": "Store deployable container images.",
+            "cost_band": "low",
+            "security_notes": ["Limit image push permissions to Cloud Build."],
+        },
+        ArchitectureNodeType.IAM_SERVICE_ACCOUNT.value: {
+            "rationale": "Isolate runtime permissions with a dedicated service account.",
+            "cost_band": "none",
+            "security_notes": ["Grant only the minimum roles required by the runtime."],
+        },
+        ArchitectureNodeType.EXTERNAL.value: {
+            "rationale": "Represent an external dependency in the architecture map.",
+            "cost_band": "external",
+            "security_notes": ["Review external trust boundaries before apply."],
+        },
+        ArchitectureNodeType.CLOUD_RUN.value: {
+            "rationale": "Run a containerized HTTP service.",
+            "cost_band": "low",
+            "security_notes": ["Require explicit approval before public access."],
+        },
+        ArchitectureNodeType.FIRESTORE.value: {
+            "rationale": "Persist structured application state.",
+            "cost_band": "low",
+            "security_notes": ["Use server-side access through the backend."],
+        },
+    }
+    template = defaults[normalized_type]
+    return {
+        "id": node_id,
+        "type": normalized_type,
+        "name": name,
+        "parameters": parameters,
+        "rationale": template["rationale"],
+        "cost_band": template["cost_band"],
+        "security_notes": template["security_notes"],
+    }
 
 
 def _impact_summary(node: ArchitectureNode, parameter_patch: dict[str, Any]) -> dict[str, str]:
