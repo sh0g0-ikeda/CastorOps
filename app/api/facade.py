@@ -1014,27 +1014,49 @@ def _parameter_patch_from_change_request(message: str) -> dict[str, Any]:
     if not normalized:
         raise ValidationAppError("message must be a non-empty string")
     patch: dict[str, Any] = {}
-    if "1gi" in normalized or "1 gi" in normalized or "more memory" in normalized or "larger memory" in normalized:
+    if (
+        "1gi" in normalized
+        or "1 gi" in normalized
+        or "more memory" in normalized
+        or "larger memory" in normalized
+        or "メモリを1gi" in normalized
+        or "1giに" in normalized
+    ):
         patch["memory"] = "1Gi"
-    elif "512mi" in normalized or "512 mi" in normalized:
+    elif "512mi" in normalized or "512 mi" in normalized or "512miに" in normalized:
         patch["memory"] = "512Mi"
-    elif "256mi" in normalized or "256 mi" in normalized or "cheaper" in normalized or "lower cost" in normalized:
+    elif (
+        "256mi" in normalized
+        or "256 mi" in normalized
+        or "cheaper" in normalized
+        or "lower cost" in normalized
+        or "安く" in normalized
+        or "低コスト" in normalized
+    ):
         patch["memory"] = "256Mi"
 
-    if "2 cpu" in normalized or "cpu 2" in normalized or "more cpu" in normalized:
+    if "2 cpu" in normalized or "cpu 2" in normalized or "more cpu" in normalized or "cpuを2" in normalized:
         patch["cpu"] = "2"
-    elif "1 cpu" in normalized or "cpu 1" in normalized or "cheaper" in normalized or "lower cost" in normalized:
+    elif (
+        "1 cpu" in normalized
+        or "cpu 1" in normalized
+        or "cheaper" in normalized
+        or "lower cost" in normalized
+        or "cpuを1" in normalized
+        or "安く" in normalized
+        or "低コスト" in normalized
+    ):
         patch["cpu"] = "1"
 
-    if "unauthenticated" in normalized or "public" in normalized:
-        patch["allow_unauthenticated"] = True
-    elif "private" in normalized or "authenticated" in normalized:
+    if "private" in normalized or "authenticated" in normalized or "非公開" in normalized or "認証必須" in normalized:
         patch["allow_unauthenticated"] = False
+    elif "unauthenticated" in normalized or "public" in normalized or "公開" in normalized:
+        patch["allow_unauthenticated"] = True
 
     if not patch:
         raise ValidationAppError(
             "chat request did not include a supported architecture change",
-            {"supported_examples": ["make it public", "use 1Gi memory", "lower cost"]},
+            {"supported_examples": ["公開してください", "メモリを1Giにしてください", "低コストにしてください"]},
         )
     return patch
 

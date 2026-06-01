@@ -1,79 +1,79 @@
 <!doctype html>
-<html lang="en">
+<html lang="ja">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>CastorOps Demo</title>
+    <title>CastorOps デモ</title>
     <link rel="stylesheet" href="/assets/styles.css">
   </head>
   <body>
     <header class="topbar">
       <div>
         <h1>CastorOps</h1>
-        <p>AI-assisted GCP design, approval-gated apply, and ops review.</p>
+        <p>AIがGCP設計、承認付きApply、運用確認を支援します。</p>
       </div>
       <div class="topStatus">
-        <div class="status" id="serverStatus">Checking server</div>
-        <div class="lockStatus" id="applyStatus">Edit lock: open</div>
+        <div class="status" id="serverStatus">サーバ確認中</div>
+        <div class="lockStatus" id="applyStatus">編集ロック: 開放中</div>
       </div>
     </header>
 
     <main class="layout">
       <section class="panel intake">
-        <h2>Project Intake</h2>
+        <h2>プロジェクト入力</h2>
         <label>
-          Project name
-          <input id="projectName" value="Support Desk Demo">
+          プロジェクト名
+          <input id="projectName" value="サポートデスク デモ">
         </label>
         <label>
-          Idea
-          <textarea id="projectIdea">Build a support desk API that stores tickets, exposes health checks, and can be deployed on Cloud Run.</textarea>
+          作りたいもの
+          <textarea id="projectIdea">問い合わせチケットを保存し、ヘルスチェックを持ち、Cloud RunにデプロイできるサポートデスクAPIを作りたい。</textarea>
         </label>
         <label>
-          Target GCP project id
+          対象GCPプロジェクトID
           <input id="targetProjectId" value="demo-gcp-project">
         </label>
         <div class="buttonRow">
-          <button id="createProjectButton">Create Project</button>
-          <button id="runDemoButton">Run Demo Flow</button>
+          <button id="createProjectButton">プロジェクト作成</button>
+          <button id="runDemoButton">デモ一括実行</button>
         </div>
         <dl class="facts">
           <div>
-            <dt>Project ID</dt>
+            <dt>プロジェクトID</dt>
             <dd id="projectId">-</dd>
           </div>
           <div>
-            <dt>Phase</dt>
+            <dt>フェーズ</dt>
             <dd id="projectPhase">-</dd>
           </div>
         </dl>
       </section>
 
       <section class="panel steps">
-        <h2>Pipeline</h2>
+        <h2>パイプライン</h2>
         <div class="stepGrid">
-          <button data-step="follow-up">Follow-up</button>
-          <button data-step="requirements">Requirements</button>
-          <button data-step="approve-requirements">Approve Requirements</button>
-          <button data-step="designs">Design Docs</button>
-          <button data-step="approve-design">Approve Design</button>
-          <button data-step="architecture">Architecture</button>
-          <button data-step="security">Security</button>
-          <button data-step="approve-architecture">Approve Architecture</button>
-          <button data-step="target-app">Target App</button>
+          <button data-step="follow-up">追加質問</button>
+          <button data-step="requirements">要件定義</button>
+          <button data-step="approve-requirements">要件を承認</button>
+          <button data-step="designs">設計書生成</button>
+          <button data-step="approve-design">設計を承認</button>
+          <button data-step="architecture">構成提案</button>
+          <button data-step="security">セキュリティ評価</button>
+          <button data-step="approve-architecture">構成を承認</button>
+          <button data-step="target-app">アプリ生成</button>
           <button data-step="apply">Apply</button>
-          <button data-step="ops">Ops Dashboard</button>
-          <button data-step="timeline">Timeline</button>
+          <button data-step="ops">運用ダッシュボード</button>
+          <button data-step="timeline">タイムライン</button>
         </div>
       </section>
 
       <section class="panel architecture">
-        <h2>Architecture Map</h2>
-        <div id="architectureMap" class="map empty">No architecture yet</div>
+        <h2>クラウド構成マップ</h2>
+        <div id="architectureMap" class="map empty">まだ構成はありません</div>
         <form id="nodeEditForm" class="nodeEditor">
-          <h3>GUI Configuration Edit</h3>
+          <h3>GUI構成編集</h3>
           <label>
-            Node ID
+            ノードID
             <input id="nodeId" value="backend">
           </label>
           <label>
@@ -93,31 +93,31 @@
           </label>
           <label class="checkboxLabel">
             <input id="allowUnauthenticated" type="checkbox">
-            Allow unauthenticated access
+            未認証アクセスを許可
           </label>
           <div class="buttonRow">
-            <button type="button" id="previewNodeButton">Preview Impact</button>
-            <button type="submit">Save Draft</button>
-            <button type="button" id="deleteNodeButton" class="dangerButton">Delete Node</button>
+            <button type="button" id="previewNodeButton">影響を確認</button>
+            <button type="submit">ドラフト保存</button>
+            <button type="button" id="deleteNodeButton" class="dangerButton">ノード削除</button>
           </div>
         </form>
-        <div id="impactPanel" class="impact empty">Preview impact before saving a draft.</div>
+        <div id="impactPanel" class="impact empty">ドラフト保存前に影響を確認できます。</div>
         <form id="chatChangeForm" class="nodeEditor">
-          <h3>Chat Re-request</h3>
+          <h3>チャットで再依頼</h3>
           <label>
-            Change request
-            <textarea id="changeRequest">make the backend public and use 1Gi memory</textarea>
+            変更依頼
+            <textarea id="changeRequest">backendを公開し、メモリを1Giにしてください</textarea>
           </label>
-          <button type="submit">Re-propose From Chat</button>
+          <button type="submit">チャットから再提案</button>
         </form>
         <form id="nodeAddForm" class="nodeEditor">
-          <h3>Node Palette</h3>
+          <h3>ノード追加</h3>
           <label>
-            New node ID
+            新規ノードID
             <input id="newNodeId" value="secrets">
           </label>
           <label>
-            Node type
+            ノード種別
             <select id="newNodeType">
               <option value="secret_manager">Secret Manager</option>
               <option value="cloud_storage">Cloud Storage</option>
@@ -129,31 +129,31 @@
             </select>
           </label>
           <label>
-            Display name
-            <input id="newNodeName" value="Runtime Secrets">
+            表示名
+            <input id="newNodeName" value="実行時シークレット">
           </label>
           <label>
-            Parameters JSON
+            パラメータJSON
             <textarea id="newNodeParameters">{"secret_names":["GEMINI_API_KEY"]}</textarea>
           </label>
-          <button type="submit">Add Node Draft</button>
+          <button type="submit">ノード追加ドラフト</button>
         </form>
         <form id="edgeEditForm" class="nodeEditor">
-          <h3>Edge Editor</h3>
+          <h3>接続編集</h3>
           <label>
-            Edge ID
+            接続ID
             <input id="edgeId" value="backend-secrets">
           </label>
           <label>
-            From node
+            接続元ノード
             <input id="edgeFrom" value="backend">
           </label>
           <label>
-            To node
+            接続先ノード
             <input id="edgeTo" value="secrets">
           </label>
           <label>
-            Edge type
+            接続種別
             <select id="edgeType">
               <option value="secret_read">Secret read</option>
               <option value="http">HTTP</option>
@@ -164,102 +164,102 @@
             </select>
           </label>
           <label>
-            Description
-            <input id="edgeDescription" value="Backend reads runtime secrets.">
+            説明
+            <input id="edgeDescription" value="Backendが実行時シークレットを読み取る。">
           </label>
           <div class="buttonRow">
-            <button type="submit">Add Edge Draft</button>
-            <button type="button" id="deleteEdgeButton" class="dangerButton">Delete Edge</button>
+            <button type="submit">接続追加ドラフト</button>
+            <button type="button" id="deleteEdgeButton" class="dangerButton">接続削除</button>
           </div>
         </form>
       </section>
 
       <section class="panel docs">
-        <h2>Generated Design Docs</h2>
-        <div id="designDocs" class="documentList empty">Generate design docs to inspect them here.</div>
+        <h2>生成された設計書</h2>
+        <div id="designDocs" class="documentList empty">設計書を生成するとここで確認できます。</div>
       </section>
 
       <section class="panel target">
-        <h2>Target App Package</h2>
+        <h2>生成アプリパッケージ</h2>
         <form id="targetAppForm" class="nodeEditor">
           <label>
-            API fields
+            APIフィールド
             <input id="targetFields" value="subject,message,email,priority">
           </label>
           <label>
-            Environment variables
+            環境変数
             <input id="targetEnvVars" value="GEMINI_API_KEY,LOG_LEVEL">
           </label>
           <div class="buttonRow">
-            <button type="submit">Generate Customized App</button>
-            <button type="button" id="reviewTargetAppButton" class="secondaryButton">AI Review</button>
+            <button type="submit">カスタムアプリ生成</button>
+            <button type="button" id="reviewTargetAppButton" class="secondaryButton">AIレビュー</button>
           </div>
         </form>
-        <div id="targetFiles" class="documentList empty">Generate the target app to inspect files here.</div>
+        <div id="targetFiles" class="documentList empty">アプリを生成するとファイルを確認できます。</div>
       </section>
 
       <section class="panel ops">
-        <h2>Ops Dashboard</h2>
-        <div id="opsDashboard" class="dashboard empty">Run the pipeline to populate ops sections.</div>
+        <h2>運用ダッシュボード</h2>
+        <div id="opsDashboard" class="dashboard empty">パイプラインを実行すると運用情報が表示されます。</div>
       </section>
 
       <section class="panel readiness">
-        <h2>Hackathon Readiness</h2>
+        <h2>ハッカソン提出準備</h2>
         <div class="buttonRow">
-          <button type="button" id="submissionBriefButton">Submission Brief</button>
-          <button type="button" id="cloudRunEvidenceButton">Cloud Run Evidence</button>
-          <button type="button" id="adapterInventoryButton">Adapter Inventory</button>
-          <button type="button" id="failureDemoButton">Failure Recovery Demo</button>
+          <button type="button" id="submissionBriefButton">提出説明</button>
+          <button type="button" id="cloudRunEvidenceButton">Cloud Run証跡</button>
+          <button type="button" id="adapterInventoryButton">アダプタ一覧</button>
+          <button type="button" id="failureDemoButton">障害復旧デモ</button>
         </div>
-        <div id="readinessPanel" class="documentList empty">Load readiness evidence for judging and recording.</div>
+        <div id="readinessPanel" class="documentList empty">審査・録画用の根拠情報をここに表示します。</div>
       </section>
 
       <section class="panel addons">
-        <h2>Optional Delivery Add-ons</h2>
+        <h2>任意の追加デモ</h2>
         <label>
-          Image artifact name
+          画像メモ名
           <input id="imageArtifactName" value="sketch.png">
         </label>
         <label>
-          Image artifact note
-          <input id="imageArtifactNote" value="Hand-drawn sketch shows Cloud Run connected to Firestore and Secret Manager.">
+          画像メモ内容
+          <input id="imageArtifactNote" value="手書きスケッチではCloud RunがFirestoreとSecret Managerに接続している。">
         </label>
         <label>
-          GitHub repository URL
+          GitHubリポジトリURL
           <input id="githubRepoUrl" value="https://github.com/sh0g0-ikeda/CastorOps">
         </label>
         <label>
-          Failed apply error
+          Apply失敗ログ
           <input id="failureText" value="Cloud Run deploy failed: permission denied">
         </label>
         <div class="buttonRow">
-          <button type="button" id="imageRequirementButton">Capture Image Note</button>
-          <button type="button" id="securityLoopButton">Security Multi-round</button>
-          <button type="button" id="terraformPreviewButton">Terraform Preview</button>
-          <button type="button" id="githubDemoButton">GitHub Demo Flow</button>
-          <button type="button" id="failureGuidanceButton">Failure Guidance</button>
+          <button type="button" id="imageRequirementButton">画像メモ取込</button>
+          <button type="button" id="securityLoopButton">複数回セキュリティ評価</button>
+          <button type="button" id="terraformPreviewButton">Terraformプレビュー</button>
+          <button type="button" id="githubDemoButton">GitHubデモ</button>
+          <button type="button" id="failureGuidanceButton">失敗時ガイド</button>
         </div>
-        <div id="addonsPanel" class="documentList empty">Run an optional add-on to inspect the result.</div>
+        <div id="addonsPanel" class="documentList empty">追加デモを実行すると結果を確認できます。</div>
       </section>
 
       <section class="panel timeline">
-        <h2>Execution Timeline</h2>
-        <div id="timelinePanel" class="timelineList empty">Run pipeline steps to see agent decisions.</div>
+        <h2>実行タイムライン</h2>
+        <div id="timelinePanel" class="timelineList empty">パイプラインを実行するとエージェントの判断履歴が表示されます。</div>
       </section>
 
       <section class="panel output">
-        <h2>Latest Response</h2>
+        <h2>最新レスポンス</h2>
         <pre id="responseOutput">{}</pre>
       </section>
     </main>
 
     <div id="modalBackdrop" class="modalBackdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <section class="modal">
-        <h2 id="modalTitle">Confirm</h2>
+        <h2 id="modalTitle">確認</h2>
         <div id="modalBody" class="modalBody"></div>
         <div class="buttonRow modalActions">
-          <button id="modalConfirmButton" class="modalButton">Confirm</button>
-          <button id="modalCancelButton" class="secondaryButton modalButton">Cancel</button>
+          <button id="modalConfirmButton" class="modalButton">実行</button>
+          <button id="modalCancelButton" class="secondaryButton modalButton">キャンセル</button>
         </div>
       </section>
     </div>
