@@ -33,6 +33,7 @@ class TimelineService:
             result=_result_from_run_status(run.status),
             agent_name=run.agent_name,
             target=target,
+            rationale_md=_run_rationale(run, action, target),
             duration_ms=_duration_ms(run),
             metadata={
                 "run_id": run.id,
@@ -60,6 +61,16 @@ def _duration_ms(run: AgentRun) -> int | None:
     if run.started_at is None or run.finished_at is None:
         return None
     return int((run.finished_at - run.started_at).total_seconds() * 1000)
+
+
+def _run_rationale(run: AgentRun, action: str, target: dict[str, str] | None) -> str:
+    target_text = "the current project"
+    if target:
+        target_text = f"{target.get('type', 'target')} {target.get('id', '')}".strip()
+    return (
+        f"{run.agent_name} executed {action} for {target_text}. "
+        "The step is recorded so the user can inspect why the pipeline advanced."
+    )
 
 
 def _event_payload(event: TimelineEvent) -> dict[str, Any]:

@@ -90,6 +90,7 @@ def make_facade() -> CastorOpsApiFacade:
             timeline_service=timeline_service,
         ),
         timeline_service=timeline_service,
+        document_service=document_service,
         approval_service=ApprovalService(
             repository=InMemoryApprovalRepository(),
             project_service=project_service,
@@ -244,6 +245,9 @@ class CastorOpsApiFacadeTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(all(item["run_status"] == "SUCCEEDED" for item in body["data"]))
 
+        documents_response = await facade.latest_documents(project_id=project_id)
+        self.assertEqual(len(documents_response.to_dict()["data"]), 8)
+
     async def test_generate_design_document_rejects_unknown_doc_type(self) -> None:
         facade = make_facade()
 
@@ -299,6 +303,21 @@ class CastorOpsApiFacadeTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("memory", editable_response.to_dict()["data"]["editable_fields"])
         self.assertTrue(preview_response.to_dict()["data"]["requires_reapply"])
         self.assertEqual(update_response.to_dict()["data"]["version"], 2)
+
+        delete_response = await facade.delete_architecture_node(
+            project_id=project_id,
+            node_id="firestore",
+            confirmed=True,
+            change_reason="Remove persistent store from the demo architecture",
+        )
+        self.assertEqual(delete_response.to_dict()["data"]["version"], 3)
+
+        chat_response = await facade.revise_architecture_from_chat(
+            project_id=project_id,
+            message="make the backend public and use 2 cpu",
+        )
+        self.assertEqual(chat_response.to_dict()["data"]["changes"]["cpu"], "2")
+        self.assertTrue(chat_response.to_dict()["data"]["requires_reapproval"])
 
     async def test_apply_latest_architecture_deploys_after_architecture_approval(self) -> None:
         facade = make_facade()

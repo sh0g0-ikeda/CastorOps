@@ -10,9 +10,12 @@
     <header class="topbar">
       <div>
         <h1>CastorOps</h1>
-        <p>Local demo workspace for AI-assisted GCP design, deploy, and ops review.</p>
+        <p>AI-assisted GCP design, approval-gated apply, and ops review.</p>
       </div>
-      <div class="status" id="serverStatus">Checking server</div>
+      <div class="topStatus">
+        <div class="status" id="serverStatus">Checking server</div>
+        <div class="lockStatus" id="applyStatus">Edit lock: open</div>
+      </div>
     </header>
 
     <main class="layout">
@@ -68,7 +71,7 @@
         <h2>Architecture Map</h2>
         <div id="architectureMap" class="map empty">No architecture yet</div>
         <form id="nodeEditForm" class="nodeEditor">
-          <h3>Edit Cloud Run Node</h3>
+          <h3>GUI Configuration Edit</h3>
           <label>
             Node ID
             <input id="nodeId" value="backend">
@@ -95,8 +98,28 @@
           <div class="buttonRow">
             <button type="button" id="previewNodeButton">Preview Impact</button>
             <button type="submit">Save Draft</button>
+            <button type="button" id="deleteNodeButton" class="dangerButton">Delete Node</button>
           </div>
         </form>
+        <div id="impactPanel" class="impact empty">Preview impact before saving a draft.</div>
+        <form id="chatChangeForm" class="nodeEditor">
+          <h3>Chat Re-request</h3>
+          <label>
+            Change request
+            <textarea id="changeRequest">make the backend public and use 1Gi memory</textarea>
+          </label>
+          <button type="submit">Re-propose From Chat</button>
+        </form>
+      </section>
+
+      <section class="panel docs">
+        <h2>Generated Design Docs</h2>
+        <div id="designDocs" class="documentList empty">Generate design docs to inspect them here.</div>
+      </section>
+
+      <section class="panel target">
+        <h2>Target App Package</h2>
+        <div id="targetFiles" class="documentList empty">Generate the target app to inspect files here.</div>
       </section>
 
       <section class="panel ops">
@@ -104,11 +127,27 @@
         <div id="opsDashboard" class="dashboard empty">Run the pipeline to populate ops sections.</div>
       </section>
 
+      <section class="panel timeline">
+        <h2>Execution Timeline</h2>
+        <div id="timelinePanel" class="timelineList empty">Run pipeline steps to see agent decisions.</div>
+      </section>
+
       <section class="panel output">
         <h2>Latest Response</h2>
         <pre id="responseOutput">{}</pre>
       </section>
     </main>
+
+    <div id="modalBackdrop" class="modalBackdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <section class="modal">
+        <h2 id="modalTitle">Confirm</h2>
+        <div id="modalBody" class="modalBody"></div>
+        <div class="buttonRow modalActions">
+          <button id="modalConfirmButton" class="modalButton">Confirm</button>
+          <button id="modalCancelButton" class="secondaryButton modalButton">Cancel</button>
+        </div>
+      </section>
+    </div>
 
     <script src="/assets/app.js"></script>
   </body>

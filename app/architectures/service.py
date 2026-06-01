@@ -256,20 +256,29 @@ def _patch_requires_confirmation(parameter_patch: dict[str, Any]) -> bool:
 
 def _impact_summary(node: ArchitectureNode, parameter_patch: dict[str, Any]) -> dict[str, str]:
     if _patch_requires_confirmation(parameter_patch):
-        security = "公開アクセスが有効になるため、認証・認可と公開範囲の確認が必要です。"
+        security = (
+            "Public access will be enabled. Confirm the endpoint is intended to be public "
+            "and that authentication or rate limiting is handled appropriately."
+        )
     else:
-        security = "既存のセキュリティ境界を直接弱める変更は検出されていません。"
+        security = "No direct weakening of the current security boundary was detected."
 
-    performance = "性能影響は軽微です。"
+    performance = "Performance impact is expected to be minor."
     if "memory" in parameter_patch or "cpu" in parameter_patch:
-        performance = "Cloud Run のリソース配分が変わるため、応答性能と起動時間が変化する可能性があります。"
+        performance = (
+            "Cloud Run resource allocation changes can affect response latency, cold starts, "
+            "and concurrency behavior."
+        )
 
-    cost = "月額コストへの影響は小さい見込みです。"
+    cost = "Monthly cost impact is expected to be small."
     if any(field in parameter_patch for field in ("memory", "cpu", "min_instances", "max_instances")):
-        cost = "Cloud Run の割り当てや常時起動数により月額コストが増減する可能性があります。"
+        cost = (
+            "Cloud Run cost may increase or decrease depending on memory, CPU, traffic, "
+            "and minimum instance settings."
+        )
 
     return {
-        "summary": f"{node.name} のパラメータ変更は再Apply後に反映されます。",
+        "summary": f"{node.name} parameter changes will take effect after the next approved apply.",
         "cost": cost,
         "security": security,
         "performance": performance,
@@ -288,4 +297,4 @@ def _proposal_spec_payload(proposal: ArchitectureProposal) -> dict[str, Any]:
 def _append_change_reason(current_text: str, change_reason: str) -> str:
     if not change_reason.strip():
         return current_text
-    return f"{current_text.strip()}\n\n変更理由: {change_reason.strip()}"
+    return f"{current_text.strip()}\n\nChange reason: {change_reason.strip()}"

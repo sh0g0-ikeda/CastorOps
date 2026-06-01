@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.agents.requirement import RequirementGenerationRequest
 from app.agents.architect import ArchitectGenerationRequest
 from app.agents.gcp_planner import GcpPlannerRequest
+from app.agents.requirement import RequirementGenerationRequest
 from app.agents.runtime import AgentRuntime
 from app.agents.runtime import InMemoryAgentStore
 from app.agents.schemas import AgentRunStatus
@@ -37,12 +37,18 @@ class DemoRequirementGenerator:
         unresolved_items = []
         follow_up_questions = []
         if "auth" not in request.follow_up_answers:
-            unresolved_items.append("認証方式")
-            follow_up_questions.append("ログイン機能は必要ですか。必要な場合は方式も教えてください。")
+            unresolved_items.append("Authentication policy")
+            follow_up_questions.append(
+                "Should this product require sign-in, or is a demo-only single user mode acceptable?"
+            )
         if not request.form_responses.get("data_storage"):
-            follow_up_questions.append("保存したいデータの種類と保持期間を教えてください。")
+            follow_up_questions.append(
+                "What data should be persisted, and how long should it be retained?"
+            )
         if not request.form_responses.get("public_scope"):
-            follow_up_questions.append("公開範囲は社内限定、招待制、一般公開のどれを想定していますか。")
+            follow_up_questions.append(
+                "Should the deployed API be private, team-only, or publicly reachable?"
+            )
 
         return {
             "follow_up_questions": follow_up_questions[:3],
@@ -56,17 +62,24 @@ class DemoArchitectGenerator:
 
     async def generate(self, request: ArchitectGenerationRequest) -> dict[str, Any]:
         title_by_type = {
-            DocumentType.BASIC_DESIGN: "基本設計書",
-            DocumentType.API_DESIGN: "API設計書",
-            DocumentType.DATA_DESIGN: "データ設計書",
-            DocumentType.OPS_DESIGN: "運用設計書",
-            DocumentType.SECURITY_DESIGN: "セキュリティ設計書",
-            DocumentType.ADR: "ADR",
-            DocumentType.TASKS: "実装タスク",
+            DocumentType.BASIC_DESIGN: "Basic Design",
+            DocumentType.API_DESIGN: "API Design",
+            DocumentType.DATA_DESIGN: "Data Design",
+            DocumentType.OPS_DESIGN: "Operations Design",
+            DocumentType.SECURITY_DESIGN: "Security Design",
+            DocumentType.ADR: "Architecture Decision Record",
+            DocumentType.TASKS: "Implementation Tasks",
         }
         title = title_by_type[request.doc_type]
         return {
-            "doc_md": f"# {title}\n\n## 1. 概要\n{request.requirements_doc_md[:120]}",
+            "doc_md": (
+                f"# {title}\n\n"
+                "## Context\n"
+                f"{request.requirements_doc_md[:240]}\n\n"
+                "## CastorOps Decision\n"
+                "Use a small Cloud Run service backed by Firestore so the demo can show "
+                "design, approval, deployment, and operations in one path.\n"
+            ),
             "references": ["requirements:latest"],
         }
 
@@ -84,17 +97,20 @@ class DemoGcpPlannerGenerator:
                         "id": "backend",
                         "type": "cloud_run",
                         "name": "CastorOps Backend",
-                        "parameters": {"memory": "512Mi", "cpu": "1"},
-                        "rationale": "FastAPI backendをCloud Runで公開する",
+                        "parameters": {"memory": "512Mi", "cpu": "1", "allow_unauthenticated": False},
+                        "rationale": "Run the CastorOps API on Cloud Run for fast container deployment.",
                         "cost_band": "low",
-                        "security_notes": ["認証必須", "最小権限のサービスアカウントを使う"],
+                        "security_notes": [
+                            "Require an approval gate before apply",
+                            "Use a dedicated service account with least privilege",
+                        ],
                     },
                     {
                         "id": "firestore",
                         "type": "firestore",
                         "name": "Project State Store",
                         "parameters": {"mode": "native"},
-                        "rationale": "プロジェクト状態と履歴を保存する",
+                        "rationale": "Persist project state, approvals, timelines, and generated documents.",
                         "cost_band": "low",
                     },
                 ],
@@ -108,7 +124,12 @@ class DemoGcpPlannerGenerator:
                     }
                 ],
             },
-            "rationale_md": "Cloud Run + Firestore のMVP構成を採用する。",
+            "rationale_md": (
+                "# Recommended GCP Architecture\n\n"
+                "Cloud Run hosts the CastorOps backend. Firestore stores project state, "
+                "approvals, generated artifacts, and timeline entries. This is the smallest "
+                "MVP architecture that still demonstrates deploy and ops visibility."
+            ),
             "cloudbuild_yaml": "steps: []",
             "gcloud_commands": ["gcloud run services list"],
         }
@@ -123,8 +144,8 @@ class DemoSecurityEvaluator:
                 {
                     "severity": "warning",
                     "category": "iam",
-                    "message": "サービスアカウント権限は実デプロイ前に絞り込む必要がある。",
-                    "suggestion": "Cloud Build SA と Backend SA を分離し、必要権限のみ付与する。",
+                    "message": "Service account permissions must be reviewed before the real deploy.",
+                    "suggestion": "Separate the Cloud Build service account from the backend runtime service account.",
                 }
             ]
         }
@@ -257,18 +278,18 @@ def _build_requirements_doc(
     request: RequirementGenerationRequest,
     unresolved_items: list[str],
 ) -> str:
-    unresolved_section = "\n".join(f"- {item}" for item in unresolved_items) or "- なし"
+    unresolved_section = "\n".join(f"- {item}" for item in unresolved_items) or "- None"
     return "\n".join(
         [
-            "# 要件定義書",
+            "# Requirements",
             "",
-            "## 1. 概要",
+            "## 1. Idea",
             request.idea,
             "",
-            "## 2. 入力フォーム",
-            f"- 回答数: {len(request.form_responses)}",
+            "## 2. Submitted Form",
+            f"- Answer count: {len(request.form_responses)}",
             "",
-            "## 3. 未確定事項",
+            "## 3. Open Items",
             unresolved_section,
         ]
     )

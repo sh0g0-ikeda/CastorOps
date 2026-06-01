@@ -12,13 +12,13 @@ Implemented:
 - Requirement follow-up question generation.
 - Requirement, design, architecture, and security agent workflow orchestration.
 - Approval gates for requirements, design, and architecture.
-- Architecture proposal validation and editable node updates.
+- Architecture proposal validation, editable node updates, chat-based re-proposal, confirmed node deletion, and impact preview.
 - Target FastAPI app package generation.
 - Deterministic Cloud Build apply plan rendering.
 - Local Cloud Build deployment simulation.
-- Ops dashboard summary sections.
-- Timeline events and SSE event encoding helpers.
-- Dependency-free local demo HTTP server and static UI.
+- Ops dashboard eight-section aggregation and local UI rendering.
+- Timeline events with expandable rationale and SSE event encoding helpers.
+- Dependency-free local demo HTTP server and static UI for design docs, target app files, GUI architecture edits, approval modals, and apply locks.
 - Container runtime for Cloud Run.
 - Cloud Build pipeline for testing, building, pushing, and deploying CastorOps.
 - GitHub Actions CI for compile, unit tests, and secret pattern smoke checks.

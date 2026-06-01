@@ -7,7 +7,7 @@ from app.workflows.demo import build_requirement_demo_response
 class DemoWorkflowTests(unittest.IsolatedAsyncioTestCase):
     async def test_requirement_demo_response_uses_api_envelope(self) -> None:
         response = await build_requirement_demo_response(
-            idea="問い合わせ管理アプリ",
+            idea="support desk app",
             owner_uid="local-user",
         )
         body = response.to_dict()
@@ -15,11 +15,11 @@ class DemoWorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(body["error"])
         self.assertEqual(body["data"]["run_status"], "SUCCEEDED")
         self.assertEqual(body["data"]["document_version"], 1)
-        self.assertEqual(body["data"]["unresolved_items"], ["認証方式"])
+        self.assertEqual(body["data"]["unresolved_items"], ["Authentication policy"])
 
     async def test_full_demo_response_runs_end_to_end(self) -> None:
         response = await build_full_demo_response(
-            idea="問い合わせ管理アプリ",
+            idea="support desk app",
             owner_uid="local-user",
             target_project_id="demo-gcp-project",
         )
