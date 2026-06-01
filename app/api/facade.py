@@ -17,6 +17,7 @@ from app.codegen.service import TargetAppCodeService
 from app.core.errors import AppError
 from app.core.errors import ValidationAppError
 from app.documents.models import DocumentType
+from app.documents.service import DocumentService
 from app.ops.service import OpsDashboardService
 from app.projects.models import ProjectPhase
 from app.projects.service import ProjectService
@@ -44,6 +45,7 @@ class CastorOpsApiFacade:
         code_service: TargetAppCodeService | None = None,
         ops_service: OpsDashboardService | None = None,
         timeline_service: TimelineService | None = None,
+        document_service: DocumentService | None = None,
         identity_provider: DemoIdentityProvider | None = None,
         approval_service: ApprovalService | None = None,
     ) -> None:
@@ -57,6 +59,7 @@ class CastorOpsApiFacade:
         self._code_service = code_service
         self._ops_service = ops_service
         self._timeline_service = timeline_service
+        self._document_service = document_service
         self._identity_provider = identity_provider or DemoIdentityProvider()
         self._approval_service = approval_service
 
@@ -310,6 +313,25 @@ class CastorOpsApiFacade:
             return ApiResponse.failed(exc, request_id=request_id)
         return ApiResponse.ok(generated_documents, request_id=request_id)
 
+    async def latest_documents(
+        self,
+        *,
+        project_id: str,
+        request_id: str | None = None,
+    ) -> ApiResponse:
+        if self._document_service is None:
+            return ApiResponse.ok([], request_id=request_id)
+        documents = []
+        try:
+            for doc_type in DocumentType:
+                try:
+                    documents.append(await self._document_service.latest_payload(project_id, doc_type))
+                except AppError:
+                    continue
+        except AppError as exc:
+            return ApiResponse.failed(exc, request_id=request_id)
+        return ApiResponse.ok(documents, request_id=request_id)
+
     async def propose_architecture(
         self,
         *,
@@ -455,6 +477,47 @@ class CastorOpsApiFacade:
             request_id=request_id,
         )
 
+    async def revise_architecture_from_chat(
+        self,
+        *,
+        project_id: str,
+        message: str,
+        request_id: str | None = None,
+    ) -> ApiResponse:
+        if self._architecture_service is None:
+            return ApiResponse.failed(
+                ValidationAppError("architecture service is not configured"),
+                request_id=request_id,
+            )
+        try:
+            parameter_patch = _parameter_patch_from_change_request(message)
+            preview = await self._architecture_service.preview_node_update(
+                project_id=project_id,
+                node_id="backend",
+                parameter_patch=parameter_patch,
+            )
+            proposal = await self._architecture_service.create_updated_node_proposal(
+                project_id=project_id,
+                node_id="backend",
+                parameter_patch=parameter_patch,
+                change_reason=f"Chat change request: {message.strip()}",
+            )
+        except AppError as exc:
+            return ApiResponse.failed(exc, request_id=request_id)
+        return ApiResponse.ok(
+            {
+                "architecture_id": proposal.id,
+                "version": proposal.version,
+                "status": proposal.status.value,
+                "node_id": "backend",
+                "changes": parameter_patch,
+                "impact": preview["impact"],
+                "requires_reapproval": True,
+                "requires_reapply": True,
+            },
+            request_id=request_id,
+        )
+
     async def delete_architecture_node(
         self,
         *,
@@ -591,3 +654,33 @@ class CastorOpsApiFacade:
             action=action,
             target=target,
         )
+
+
+def _parameter_patch_from_change_request(message: str) -> dict[str, Any]:
+    normalized = message.strip().lower()
+    if not normalized:
+        raise ValidationAppError("message must be a non-empty string")
+    patch: dict[str, Any] = {}
+    if "1gi" in normalized or "1 gi" in normalized or "more memory" in normalized or "larger memory" in normalized:
+        patch["memory"] = "1Gi"
+    elif "512mi" in normalized or "512 mi" in normalized:
+        patch["memory"] = "512Mi"
+    elif "256mi" in normalized or "256 mi" in normalized or "cheaper" in normalized or "lower cost" in normalized:
+        patch["memory"] = "256Mi"
+
+    if "2 cpu" in normalized or "cpu 2" in normalized or "more cpu" in normalized:
+        patch["cpu"] = "2"
+    elif "1 cpu" in normalized or "cpu 1" in normalized or "cheaper" in normalized or "lower cost" in normalized:
+        patch["cpu"] = "1"
+
+    if "unauthenticated" in normalized or "public" in normalized:
+        patch["allow_unauthenticated"] = True
+    elif "private" in normalized or "authenticated" in normalized:
+        patch["allow_unauthenticated"] = False
+
+    if not patch:
+        raise ValidationAppError(
+            "chat request did not include a supported architecture change",
+            {"supported_examples": ["make it public", "use 1Gi memory", "lower cost"]},
+        )
+    return patch

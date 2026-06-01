@@ -35,15 +35,32 @@ body {
   margin: 6px 0 0;
 }
 
-.status {
-  background: #1e8e3e;
+.topStatus {
+  display: grid;
+  gap: 8px;
+  min-width: 180px;
+}
+
+.status,
+.lockStatus {
   border-radius: 999px;
   color: #ffffff;
   font-size: 13px;
   font-weight: 700;
-  min-width: 136px;
   padding: 8px 12px;
   text-align: center;
+}
+
+.status {
+  background: #1e8e3e;
+}
+
+.lockStatus {
+  background: #36556f;
+}
+
+body.applying .lockStatus {
+  background: #b06000;
 }
 
 .layout {
@@ -77,7 +94,10 @@ body {
 }
 
 .architecture,
+.docs,
+.target,
 .ops,
+.timeline,
 .output {
   grid-column: 2;
 }
@@ -128,6 +148,29 @@ button:disabled {
   cursor: wait;
 }
 
+.secondaryButton {
+  background: #52616f;
+}
+
+.secondaryButton:hover {
+  background: #3e4c59;
+}
+
+.dangerButton {
+  background: #b3261e;
+}
+
+.dangerButton:hover {
+  background: #8c1d18;
+}
+
+.smallButton {
+  font-size: 12px;
+  margin-top: 10px;
+  min-height: 32px;
+  padding: 6px 9px;
+}
+
 .buttonRow {
   display: flex;
   flex-wrap: wrap;
@@ -170,13 +213,16 @@ button:disabled {
   border-radius: 8px;
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   min-height: 180px;
   padding: 12px;
 }
 
 .map.empty,
-.dashboard.empty {
+.dashboard.empty,
+.documentList.empty,
+.timelineList.empty,
+.impact.empty {
   align-items: center;
   color: #697784;
   display: flex;
@@ -187,7 +233,7 @@ button:disabled {
   background: #eef4ff;
   border: 1px solid #bad0f4;
   border-radius: 8px;
-  min-height: 116px;
+  min-height: 136px;
   padding: 12px;
 }
 
@@ -201,6 +247,7 @@ button:disabled {
   display: block;
   font-size: 12px;
   margin-top: 3px;
+  overflow-wrap: anywhere;
 }
 
 .nodeEditor {
@@ -220,16 +267,27 @@ button:disabled {
   width: auto;
 }
 
-.dashboard {
+.impact,
+.dashboard,
+.documentList,
+.timelineList {
   border: 1px solid #dbe1e8;
   border-radius: 8px;
   display: grid;
   gap: 10px;
-  min-height: 180px;
+  min-height: 120px;
   padding: 12px;
 }
 
-.metric {
+.impact span {
+  color: #52616f;
+  display: block;
+  font-size: 13px;
+}
+
+.metric,
+.documentItem,
+.timelineItem {
   background: #f5f8fb;
   border: 1px solid #e1e8ef;
   border-radius: 8px;
@@ -240,6 +298,21 @@ button:disabled {
   display: block;
   font-size: 13px;
   margin-bottom: 4px;
+}
+
+.metric span,
+.timelineItem span {
+  color: #52616f;
+  display: block;
+  font-size: 12px;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+summary {
+  cursor: pointer;
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 pre {
@@ -253,12 +326,68 @@ pre {
   max-height: 420px;
   overflow: auto;
   padding: 12px;
+  white-space: pre-wrap;
+}
+
+.documentItem pre,
+.timelineItem pre,
+.miniJson {
+  margin-top: 10px;
+  max-height: 260px;
+}
+
+.modalBackdrop {
+  align-items: center;
+  background: rgba(15, 23, 42, 0.58);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 18px;
+  position: fixed;
+  z-index: 10;
+}
+
+.modalBackdrop.hidden {
+  display: none;
+}
+
+.modal {
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.32);
+  max-width: 560px;
+  padding: 18px;
+  width: 100%;
+}
+
+.modal h2 {
+  font-size: 18px;
+  margin: 0 0 10px;
+}
+
+.modalBody {
+  color: #3e4c59;
+  display: grid;
+  gap: 8px;
+}
+
+.modalBody p {
+  margin: 0;
+}
+
+.modalActions {
+  justify-content: flex-end;
+  margin-top: 16px;
 }
 
 @media (max-width: 900px) {
   .topbar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .topStatus {
+    width: 100%;
   }
 
   .layout {
@@ -268,7 +397,10 @@ pre {
   .intake,
   .steps,
   .architecture,
+  .docs,
+  .target,
   .ops,
+  .timeline,
   .output {
     grid-column: 1;
   }

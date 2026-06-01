@@ -98,6 +98,8 @@ class DemoWebApp:
             )
         if method == "POST" and action == ("designs",):
             return _api_response(await self._facade.generate_design_set(project_id=project_id))
+        if method == "GET" and action == ("documents",):
+            return _api_response(await self._facade.latest_documents(project_id=project_id))
         if method == "POST" and action == ("architecture",):
             return _api_response(
                 await self._facade.propose_architecture(
@@ -122,6 +124,22 @@ class DemoWebApp:
                     node_id=_required_string(payload, "node_id"),
                     parameter_patch=_optional_object(payload, "parameter_patch"),
                     change_reason=_optional_string(payload, "change_reason", "Updated from demo UI"),
+                )
+            )
+        if method == "POST" and action == ("architecture", "chat-revise"):
+            return _api_response(
+                await self._facade.revise_architecture_from_chat(
+                    project_id=project_id,
+                    message=_required_string(payload, "message"),
+                )
+            )
+        if method == "POST" and action == ("architecture", "delete-node"):
+            return _api_response(
+                await self._facade.delete_architecture_node(
+                    project_id=project_id,
+                    node_id=_required_string(payload, "node_id"),
+                    confirmed=_optional_bool(payload, "confirmed", False),
+                    change_reason=_optional_string(payload, "change_reason", "Deleted from demo UI"),
                 )
             )
         if method == "POST" and action == ("security",):
@@ -264,10 +282,19 @@ def _required_string(payload: dict[str, Any], field_name: str) -> str:
 
 
 def _optional_string(payload: dict[str, Any], field_name: str, default: str) -> str:
-    value = payload.get(field_name, default)
+    if field_name not in payload:
+        return default
+    value = payload[field_name]
     if not isinstance(value, str) or not value.strip():
         raise ValidationAppError(f"{field_name} must be a non-empty string")
     return value.strip()
+
+
+def _optional_bool(payload: dict[str, Any], field_name: str, default: bool) -> bool:
+    value = payload.get(field_name, default)
+    if not isinstance(value, bool):
+        raise ValidationAppError(f"{field_name} must be a boolean")
+    return value
 
 
 def _static_response(path: Path, content_type: str) -> tuple[int, str, bytes]:

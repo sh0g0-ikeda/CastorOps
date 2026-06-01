@@ -124,25 +124,25 @@ def _next_actions(project_phase: str, findings: list[Any]) -> list[dict[str, str
         return [
             {
                 "priority": "high",
-                "title": "Critical findings を解消する",
-                "rationale": "構成適用前に重大なセキュリティ指摘を解消してください。",
+                "title": "Resolve critical security findings",
+                "rationale": "Critical findings must be fixed before applying infrastructure changes.",
             }
         ]
     actions_by_phase = {
-        "DRAFT": "要件入力を開始する",
-        "REQUIREMENT_DRAFT": "要件定義書を承認する",
-        "REQUIREMENT_APPROVED": "設計書を生成する",
-        "DESIGN_DRAFT": "設計書を承認する",
-        "DESIGN_APPROVED": "GCP構成案を生成する",
-        "ARCHITECTURE_DRAFT": "セキュリティ評価を確認して構成を承認する",
-        "ARCHITECTURE_APPROVED": "構成をApplyする",
-        "READY_TO_APPLY": "Cloud Buildを起動する",
-        "DEPLOYED": "デモURLとダッシュボードを確認する",
+        "DRAFT": "Start requirements discovery",
+        "REQUIREMENT_DRAFT": "Review and approve the requirements document",
+        "REQUIREMENT_APPROVED": "Generate the design document set",
+        "DESIGN_DRAFT": "Review and approve the design documents",
+        "DESIGN_APPROVED": "Generate the GCP architecture proposal",
+        "ARCHITECTURE_DRAFT": "Run security evaluation and approve the architecture",
+        "ARCHITECTURE_APPROVED": "Apply the approved architecture",
+        "READY_TO_APPLY": "Start the Cloud Build apply pipeline",
+        "DEPLOYED": "Check the deployed URL and ops dashboard",
     }
     return [
         {
             "priority": "normal",
-            "title": actions_by_phase.get(project_phase, "状態を確認する"),
-            "rationale": "現在のフェーズから次に進むための推奨操作です。",
+            "title": actions_by_phase.get(project_phase, "Check the current project state"),
+            "rationale": "This is the recommended next action for the current workflow phase.",
         }
     ]

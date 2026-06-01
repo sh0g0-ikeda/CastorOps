@@ -94,6 +94,7 @@ def build_demo_facade() -> CastorOpsApiFacade:
             timeline_service=timeline_service,
         ),
         timeline_service=timeline_service,
+        document_service=document_service,
         approval_service=ApprovalService(
             repository=InMemoryApprovalRepository(),
             project_service=project_service,

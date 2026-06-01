@@ -37,9 +37,9 @@ class TargetAppCodeService:
             app_name=normalized_app_name,
             files=files,
             notes_md=(
-                "# 生成メモ\n\n"
-                "- 問い合わせ管理APIテンプレートを起点に生成しました。\n"
-                "- Cloud Run デプロイを前提にしています。\n"
+                "# Generation Notes\n\n"
+                "- Generated a small inquiry API template for Cloud Run.\n"
+                "- The package includes tests, a Dockerfile, and a Cloud Build pipeline.\n"
             ),
         )
         await self._repository.create(result)
@@ -61,7 +61,7 @@ def _render_files(
     return (
         GeneratedFile(
             path="README.md",
-            content=f"# {app_name}\n\nCloud Run向けの問い合わせ管理APIです。\n",
+            content=f"# {app_name}\n\nA Cloud Run-ready inquiry management API.\n",
         ),
         GeneratedFile(
             path="requirements.txt",
