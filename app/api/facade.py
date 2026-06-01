@@ -50,6 +50,7 @@ class CastorOpsApiFacade:
         deployment_service: DeploymentService | None = None,
         identity_provider: DemoIdentityProvider | None = None,
         approval_service: ApprovalService | None = None,
+        agent_provider_mode: str = "demo",
     ) -> None:
         self._project_service = project_service
         self._requirement_workflow = requirement_workflow
@@ -65,6 +66,7 @@ class CastorOpsApiFacade:
         self._deployment_service = deployment_service
         self._identity_provider = identity_provider or DemoIdentityProvider()
         self._approval_service = approval_service
+        self._agent_provider_mode = agent_provider_mode
 
     async def create_project(
         self,
@@ -868,13 +870,21 @@ class CastorOpsApiFacade:
 
     async def adapter_inventory(self, *, project_id: str, request_id: str | None = None) -> ApiResponse:
         _ = project_id
+        uses_gemini = self._agent_provider_mode == "gemini"
+        agent_mode = "gemini_api" if uses_gemini else "demo_agent"
+        ai_generation = (
+            {"provider": "Gemini API", "mode": "live_api_key"}
+            if uses_gemini
+            else {"provider": "Gemini API", "mode": "demo_agent_pending_api_key"}
+        )
         return ApiResponse.ok(
             {
                 "runtime": {"product": "Cloud Run", "mode": "live_deploy_supported"},
-                "ai_generation": {"provider": "Gemini/Vertex AI", "mode": "pending_final_live_credentials"},
-                "requirements_agent": {"mode": "demo_agent", "live_target": "Gemini"},
-                "architect_agent": {"mode": "demo_agent", "live_target": "Gemini"},
-                "security_agent": {"mode": "demo_agent", "live_target": "Gemini"},
+                "ai_generation": ai_generation,
+                "requirements_agent": {"mode": agent_mode, "live_target": "Gemini API"},
+                "architect_agent": {"mode": agent_mode, "live_target": "Gemini API"},
+                "planner_agent": {"mode": agent_mode, "live_target": "Gemini API"},
+                "security_agent": {"mode": agent_mode, "live_target": "Gemini API"},
                 "cloud_build_apply": {"mode": "demo_adapter", "live_target": "Cloud Build + Cloud Run"},
                 "github_delivery": {"mode": "demo_adapter", "live_target": "GitHub API"},
                 "terraform_preview": {"mode": "preview_only", "live_target": "future IaC adapter"},
@@ -900,7 +910,11 @@ class CastorOpsApiFacade:
                 },
                 "google_cloud_usage": {
                     "required_runtime": "Cloud Run",
-                    "required_ai": "Gemini/Vertex AI final live adapter planned for submission; current demo keeps deterministic agent adapters for repeatable judging.",
+                    "required_ai": (
+                        "Gemini API is active through GEMINI_API_KEY for requirements, design, planning, and security agents."
+                        if self._agent_provider_mode == "gemini"
+                        else "Gemini API adapter is available; current process is using deterministic demo agents until CASTOROPS_AGENT_PROVIDER=gemini and GEMINI_API_KEY are set."
+                    ),
                     "supporting_services": ["Cloud Build", "Artifact Registry", "Firestore", "Cloud Logging", "Cloud Monitoring"],
                 },
                 "demo_scenes": [
