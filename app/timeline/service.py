@@ -16,8 +16,9 @@ from app.timeline.repository import TimelineRepository
 class TimelineService:
     """Create user-facing timeline events."""
 
-    def __init__(self, repository: TimelineRepository) -> None:
+    def __init__(self, repository: TimelineRepository, *, agent_adapter_mode: str = "demo_agent") -> None:
         self._repository = repository
+        self._agent_adapter_mode = agent_adapter_mode
 
     async def record_agent_run(
         self,
@@ -41,7 +42,7 @@ class TimelineService:
                 "error_code": run.error_code,
                 "decision": _decision_summary(action),
                 "tool_boundary": _tool_boundary(action),
-                "adapter_mode": _adapter_mode(action),
+                "adapter_mode": self._adapter_mode(action),
                 "next_expected_action": _next_expected_action(action),
             },
         )
@@ -51,6 +52,17 @@ class TimelineService:
     async def list_payloads(self, project_id: str) -> list[dict[str, Any]]:
         events = await self._repository.list_by_project(project_id)
         return [_event_payload(event) for event in events]
+
+    def _adapter_mode(self, action: str) -> str:
+        if action in {
+            "generated_follow_up_questions",
+            "generated_requirements",
+            "generated_design_document",
+            "proposed_architecture",
+            "evaluated_security",
+        }:
+            return self._agent_adapter_mode
+        return "demo_adapter"
 
 
 def _result_from_run_status(status: AgentRunStatus) -> TimelineResult:
@@ -97,12 +109,6 @@ def _tool_boundary(action: str) -> str:
         "generated_follow_up_questions": "agent_runtime",
     }
     return tools.get(action, "agent_runtime")
-
-
-def _adapter_mode(action: str) -> str:
-    if action in {"proposed_architecture", "evaluated_security", "generated_design_document", "generated_requirements"}:
-        return "demo_agent"
-    return "demo_adapter"
 
 
 def _next_expected_action(action: str) -> str:
