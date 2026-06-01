@@ -14,6 +14,7 @@ class TargetAppCodeServiceTests(unittest.IsolatedAsyncioTestCase):
             app_name="Support Desk API",
             collection_name="support_tickets",
             fields=("subject", "message"),
+            env_vars=("GEMINI_API_KEY",),
         )
         paths = {generated_file.path for generated_file in result.files}
         payload = await service.latest_payload("project-1")
@@ -35,6 +36,9 @@ class TargetAppCodeServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("gcloud", cloudbuild_yaml)
         self.assertIn("${PORT:-8080}", dockerfile)
         self.assertEqual(payload["app_name"], "Support Desk API")
+        self.assertIn("GEMINI_API_KEY", payload["files"][0]["content"])
+        review = await service.review_latest("project-1")
+        self.assertTrue(review["passed"])
 
     async def test_generate_inquiry_api_rejects_unsafe_field_name(self) -> None:
         service = TargetAppCodeService(InMemoryCodeGenerationRepository())

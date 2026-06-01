@@ -10,10 +10,14 @@ Implemented:
 
 - Project creation and phase transitions.
 - Requirement follow-up question generation.
+- Demo image-artifact capture for visual requirement notes.
 - Requirement, design, architecture, and security agent workflow orchestration.
 - Approval gates for requirements, design, and architecture.
-- Architecture proposal validation, editable node updates, chat-based re-proposal, confirmed node deletion, and impact preview.
-- Target FastAPI app package generation.
+- Architecture proposal validation, editable node updates, chat-based re-proposal, confirmed node deletion, node addition, edge editing, and impact preview.
+- Target FastAPI app package generation with custom fields, environment variable documentation, generated tests, and demo AI review.
+- Demo GitHub delivery adapter for repository read, branch creation, push, and Draft PR payloads.
+- Terraform preview generation for the COULD-level IaC path.
+- Apply failure guidance with rollback candidate suggestions.
 - Deterministic Cloud Build apply plan rendering.
 - Local Cloud Build deployment simulation.
 - Ops dashboard eight-section aggregation and local UI rendering.

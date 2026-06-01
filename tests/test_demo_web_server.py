@@ -80,6 +80,36 @@ class DemoWebServerTests(unittest.IsolatedAsyncioTestCase):
             raw_path=f"/api/projects/{project_id}/architecture/chat-revise",
             body=json.dumps({"message": "use 1Gi memory"}).encode("utf-8"),
         )
+        add_node_status, _, add_node_body = await app.handle(
+            method="POST",
+            raw_path=f"/api/projects/{project_id}/architecture/add-node",
+            body=json.dumps(
+                {
+                    "node_id": "secrets",
+                    "node_type": "secret_manager",
+                    "name": "Runtime Secrets",
+                    "parameters": {"secret_names": ["GEMINI_API_KEY"]},
+                }
+            ).encode("utf-8"),
+        )
+        add_edge_status, _, add_edge_body = await app.handle(
+            method="POST",
+            raw_path=f"/api/projects/{project_id}/architecture/add-edge",
+            body=json.dumps(
+                {
+                    "edge_id": "backend-secrets",
+                    "from_node": "backend",
+                    "to_node": "secrets",
+                    "edge_type": "secret_read",
+                    "description": "Backend reads runtime secrets.",
+                }
+            ).encode("utf-8"),
+        )
+        delete_edge_status, _, delete_edge_body = await app.handle(
+            method="POST",
+            raw_path=f"/api/projects/{project_id}/architecture/delete-edge",
+            body=json.dumps({"edge_id": "backend-secrets"}).encode("utf-8"),
+        )
 
         self.assertEqual(preview_status, 200)
         self.assertTrue(json.loads(preview_body.decode("utf-8"))["data"]["requires_reapply"])
@@ -87,6 +117,69 @@ class DemoWebServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(json.loads(delete_body.decode("utf-8"))["data"]["version"], 2)
         self.assertEqual(chat_status, 200)
         self.assertEqual(json.loads(chat_body.decode("utf-8"))["data"]["changes"]["memory"], "1Gi")
+        self.assertEqual(add_node_status, 200)
+        self.assertEqual(json.loads(add_node_body.decode("utf-8"))["data"]["node_id"], "secrets")
+        self.assertEqual(add_edge_status, 200)
+        self.assertEqual(json.loads(add_edge_body.decode("utf-8"))["data"]["edge_id"], "backend-secrets")
+        self.assertEqual(delete_edge_status, 200)
+        self.assertEqual(json.loads(delete_edge_body.decode("utf-8"))["data"]["edge_id"], "backend-secrets")
+
+    async def test_optional_delivery_routes_return_demo_payloads(self) -> None:
+        app = DemoWebApp(build_demo_facade(), target_project_id="demo-gcp-project")
+
+        _, _, create_body = await app.handle(
+            method="POST",
+            raw_path="/api/projects",
+            body=json.dumps({"name": "Support Desk", "idea": "support desk app"}).encode("utf-8"),
+        )
+        project_id = json.loads(create_body.decode("utf-8"))["data"]["id"]
+        for action, body in (
+            ("requirements", {}),
+            ("approve", {"gate": "requirements", "decision": "approved"}),
+            ("designs", {}),
+            ("approve", {"gate": "design", "decision": "approved"}),
+            ("architecture", {"target_project_id": "demo-gcp-project"}),
+            ("target-app", {"fields": ["subject", "message"], "env_vars": ["GEMINI_API_KEY"]}),
+        ):
+            await app.handle(
+                method="POST",
+                raw_path=f"/api/projects/{project_id}/{action}",
+                body=json.dumps(body).encode("utf-8"),
+            )
+
+        terraform_status, _, terraform_body = await app.handle(
+            method="GET",
+            raw_path=f"/api/projects/{project_id}/terraform/preview",
+        )
+        github_status, _, github_body = await app.handle(
+            method="POST",
+            raw_path=f"/api/projects/{project_id}/github/demo",
+            body=json.dumps({"repo_url": "https://github.com/sh0g0-ikeda/CastorOps"}).encode("utf-8"),
+        )
+        review_status, _, review_body = await app.handle(
+            method="POST",
+            raw_path=f"/api/projects/{project_id}/target-app/review",
+            body=b"{}",
+        )
+        image_status, _, image_body = await app.handle(
+            method="POST",
+            raw_path=f"/api/projects/{project_id}/requirements/image-artifact",
+            body=json.dumps(
+                {
+                    "file_name": "sketch.png",
+                    "description": "Cloud Run connected to Firestore",
+                }
+            ).encode("utf-8"),
+        )
+
+        self.assertEqual(terraform_status, 200)
+        self.assertEqual(json.loads(terraform_body.decode("utf-8"))["data"]["mode"], "preview_only")
+        self.assertEqual(github_status, 200)
+        self.assertTrue(json.loads(github_body.decode("utf-8"))["data"]["draft_pr"]["created"])
+        self.assertEqual(review_status, 200)
+        self.assertTrue(json.loads(review_body.decode("utf-8"))["data"]["passed"])
+        self.assertEqual(image_status, 200)
+        self.assertEqual(json.loads(image_body.decode("utf-8"))["data"]["mode"], "demo_image_artifact")
 
     async def test_invalid_json_returns_validation_error(self) -> None:
         app = DemoWebApp(build_demo_facade(), target_project_id="demo-gcp-project")

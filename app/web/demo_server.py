@@ -86,6 +86,14 @@ class DemoWebApp:
             )
         if method == "POST" and action == ("requirements",):
             return _api_response(await self._facade.generate_requirements(project_id=project_id))
+        if method == "POST" and action == ("requirements", "image-artifact"):
+            return _api_response(
+                await self._facade.capture_image_requirement(
+                    project_id=project_id,
+                    file_name=_required_string(payload, "file_name"),
+                    description=_required_string(payload, "description"),
+                )
+            )
         if method == "POST" and action == ("approve",):
             return _api_response(
                 await self._facade.decide_approval(
@@ -142,24 +150,84 @@ class DemoWebApp:
                     change_reason=_optional_string(payload, "change_reason", "Deleted from demo UI"),
                 )
             )
+        if method == "POST" and action == ("architecture", "add-node"):
+            return _api_response(
+                await self._facade.add_architecture_node(
+                    project_id=project_id,
+                    node_id=_required_string(payload, "node_id"),
+                    node_type=_required_string(payload, "node_type"),
+                    name=_required_string(payload, "name"),
+                    parameters=_optional_object(payload, "parameters"),
+                    change_reason=_optional_string(payload, "change_reason", "Added from demo UI"),
+                )
+            )
+        if method == "POST" and action == ("architecture", "add-edge"):
+            return _api_response(
+                await self._facade.add_architecture_edge(
+                    project_id=project_id,
+                    edge_id=_required_string(payload, "edge_id"),
+                    from_node=_required_string(payload, "from_node"),
+                    to_node=_required_string(payload, "to_node"),
+                    edge_type=_required_string(payload, "edge_type"),
+                    description=_required_string(payload, "description"),
+                    change_reason=_optional_string(payload, "change_reason", "Added edge from demo UI"),
+                )
+            )
+        if method == "POST" and action == ("architecture", "delete-edge"):
+            return _api_response(
+                await self._facade.delete_architecture_edge(
+                    project_id=project_id,
+                    edge_id=_required_string(payload, "edge_id"),
+                    change_reason=_optional_string(payload, "change_reason", "Deleted edge from demo UI"),
+                )
+            )
         if method == "POST" and action == ("security",):
             return _api_response(await self._facade.evaluate_security(project_id=project_id))
+        if method == "POST" and action == ("security", "loop"):
+            return _api_response(
+                await self._facade.evaluate_security_loop(
+                    project_id=project_id,
+                    rounds=_optional_int(payload, "rounds", 2),
+                )
+            )
         if method == "POST" and action == ("target-app",):
             fields = payload.get("fields", ["subject", "message", "email"])
             if not isinstance(fields, list) or not all(isinstance(item, str) for item in fields):
                 raise ValidationAppError("fields must be a string list")
+            env_vars = payload.get("env_vars", [])
+            if not isinstance(env_vars, list) or not all(isinstance(item, str) for item in env_vars):
+                raise ValidationAppError("env_vars must be a string list")
             return _api_response(
                 await self._facade.generate_target_app(
                     project_id=project_id,
                     app_name=_optional_string(payload, "app_name", "Support Desk API"),
                     collection_name=_optional_string(payload, "collection_name", "support_tickets"),
                     fields=tuple(fields),
+                    env_vars=tuple(env_vars),
                 )
             )
         if method == "GET" and action == ("target-app", "latest"):
             return _api_response(await self._facade.latest_target_app(project_id=project_id))
+        if method == "POST" and action == ("target-app", "review"):
+            return _api_response(await self._facade.review_latest_target_app(project_id=project_id))
         if method == "POST" and action == ("apply",):
             return _api_response(await self._facade.apply_latest_architecture(project_id=project_id))
+        if method == "POST" and action == ("apply", "failure-guidance"):
+            return _api_response(
+                await self._facade.apply_failure_guidance(
+                    project_id=project_id,
+                    error_text=_required_string(payload, "error_text"),
+                )
+            )
+        if method == "GET" and action == ("terraform", "preview"):
+            return _api_response(await self._facade.terraform_preview(project_id=project_id))
+        if method == "POST" and action == ("github", "demo"):
+            return _api_response(
+                await self._facade.github_demo_flow(
+                    project_id=project_id,
+                    repo_url=_required_string(payload, "repo_url"),
+                )
+            )
         if method == "GET" and action == ("ops",):
             return _api_response(await self._facade.ops_overview(project_id=project_id))
         if method == "GET" and action == ("timeline",):
@@ -294,6 +362,13 @@ def _optional_bool(payload: dict[str, Any], field_name: str, default: bool) -> b
     value = payload.get(field_name, default)
     if not isinstance(value, bool):
         raise ValidationAppError(f"{field_name} must be a boolean")
+    return value
+
+
+def _optional_int(payload: dict[str, Any], field_name: str, default: int) -> int:
+    value = payload.get(field_name, default)
+    if not isinstance(value, int):
+        raise ValidationAppError(f"{field_name} must be an integer")
     return value
 
 

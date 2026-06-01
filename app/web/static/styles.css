@@ -97,6 +97,7 @@ body.applying .lockStatus {
 .docs,
 .target,
 .ops,
+.addons,
 .timeline,
 .output {
   grid-column: 2;
@@ -229,7 +230,8 @@ button:disabled {
   justify-content: center;
 }
 
-.node {
+.node,
+.edge {
   background: #eef4ff;
   border: 1px solid #bad0f4;
   border-radius: 8px;
@@ -237,12 +239,19 @@ button:disabled {
   padding: 12px;
 }
 
-.node strong {
+.edge {
+  background: #f6f1ff;
+  border-color: #d7c6f4;
+}
+
+.node strong,
+.edge strong {
   display: block;
   margin-bottom: 8px;
 }
 
-.node span {
+.node span,
+.edge span {
   color: #52616f;
   display: block;
   font-size: 12px;
@@ -400,6 +409,7 @@ pre {
   .docs,
   .target,
   .ops,
+  .addons,
   .timeline,
   .output {
     grid-column: 1;
