@@ -219,6 +219,13 @@ class DemoWebApp:
                     error_text=_required_string(payload, "error_text"),
                 )
             )
+        if method == "POST" and action == ("apply", "failure-demo"):
+            return _api_response(
+                await self._facade.apply_failure_demo(
+                    project_id=project_id,
+                    error_text=_required_string(payload, "error_text"),
+                )
+            )
         if method == "GET" and action == ("terraform", "preview"):
             return _api_response(await self._facade.terraform_preview(project_id=project_id))
         if method == "POST" and action == ("github", "demo"):
@@ -228,6 +235,12 @@ class DemoWebApp:
                     repo_url=_required_string(payload, "repo_url"),
                 )
             )
+        if method == "GET" and action == ("runtime", "cloud-run"):
+            return _api_response(await self._facade.cloud_run_evidence(project_id=project_id))
+        if method == "GET" and action == ("adapters",):
+            return _api_response(await self._facade.adapter_inventory(project_id=project_id))
+        if method == "GET" and action == ("submission", "brief"):
+            return _api_response(await self._facade.submission_brief(project_id=project_id))
         if method == "GET" and action == ("ops",):
             return _api_response(await self._facade.ops_overview(project_id=project_id))
         if method == "GET" and action == ("timeline",):

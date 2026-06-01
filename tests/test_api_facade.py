@@ -91,6 +91,7 @@ def make_facade() -> CastorOpsApiFacade:
         ),
         timeline_service=timeline_service,
         document_service=document_service,
+        deployment_service=deployment_service,
         approval_service=ApprovalService(
             repository=InMemoryApprovalRepository(),
             project_service=project_service,
@@ -451,13 +452,24 @@ class CastorOpsApiFacadeTests(unittest.IsolatedAsyncioTestCase):
             project_id=project_id,
             error_text="Cloud Run deploy failed: permission denied",
         )
+        failure_demo_response = await facade.apply_failure_demo(
+            project_id=project_id,
+            error_text="Cloud Run deploy failed: permission denied",
+        )
         security_loop_response = await facade.evaluate_security_loop(project_id=project_id, rounds=2)
+        adapter_response = await facade.adapter_inventory(project_id=project_id)
+        brief_response = await facade.submission_brief(project_id=project_id)
+        cloud_run_response = await facade.cloud_run_evidence(project_id=project_id)
 
         self.assertEqual(image_response.to_dict()["data"]["mode"], "demo_image_artifact")
         self.assertEqual(terraform_response.to_dict()["data"]["mode"], "preview_only")
         self.assertTrue(github_response.to_dict()["data"]["draft_pr"]["created"])
         self.assertIn("IAM", guidance_response.to_dict()["data"]["likely_cause"])
+        self.assertTrue(failure_demo_response.to_dict()["data"]["recovery_demo"]["kept_previous_revision"])
         self.assertEqual(security_loop_response.to_dict()["data"]["stopped_reason"], "no_critical_findings")
+        self.assertEqual(adapter_response.to_dict()["data"]["cloud_build_apply"]["mode"], "demo_adapter")
+        self.assertEqual(brief_response.to_dict()["data"]["product"], "CastorOps")
+        self.assertEqual(cloud_run_response.to_dict()["data"]["runtime_product"], "Cloud Run")
 
     async def test_ops_overview_returns_dashboard_sections(self) -> None:
         facade = make_facade()
@@ -487,6 +499,7 @@ class CastorOpsApiFacadeTests(unittest.IsolatedAsyncioTestCase):
         ops_response = await facade.ops_overview(project_id=project_id)
 
         self.assertEqual(response.to_dict()["data"][0]["action"], "generated_requirements")
+        self.assertIn("decision", response.to_dict()["data"][0]["metadata"])
         self.assertEqual(
             ops_response.to_dict()["data"]["agent_actions"][0]["action"],
             "generated_requirements",

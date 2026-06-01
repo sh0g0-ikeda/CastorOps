@@ -42,6 +42,20 @@ The main design document is:
 
 The design document is the source of truth for the intended hackathon product scope, architecture, and later production direction.
 
+## Hackathon Criteria Coverage
+
+| Condition / judging point | CastorOps evidence in this repo | Status |
+| --- | --- | --- |
+| Google Cloud application runtime | Dockerfile, Cloud Build deployment pipeline, Cloud Run service evidence panel, and `scripts/deploy_self.ps1` target Cloud Run. | Implemented |
+| Google Cloud AI technology | Gemini / Vertex AI is the planned final live adapter. Demo agents remain deterministic until credentials are configured for submission. | Final live adapter pending |
+| AI agent is central to the value | Requirement, architect, planner, security, code review, ops, and failure-recovery flows are exposed through the API and Timeline. | Implemented |
+| Problem approach | Submission Brief panel explains target user, pain, before/after, Google Cloud usage, and demo scenes. | Implemented |
+| Usability | Browser demo includes approval modals, impact review, edit lock, architecture map editing, Ops Dashboard, and readiness evidence panels. | Implemented |
+| Practicality and experience value | Apply failure guidance, rollback candidates, Cloud Run evidence, adapter inventory, generated app files, and ops recommendations are visible. | Implemented |
+| Implementation quality | Unit tests, compile checks, JS syntax check, Cloud Build config, GitHub Actions CI, and no-secret guidance are included. | Implemented |
+
+The browser demo labels non-live integrations as `demo_adapter`, `demo_agent`, or `preview_only` so judges can distinguish repeatable demo behavior from final live cloud integrations.
+
 ## Requirements
 
 - Python 3.11 or newer.

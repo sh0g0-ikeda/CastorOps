@@ -16,6 +16,7 @@ from app.api.responses import ApiResponse
 from app.codegen.service import TargetAppCodeService
 from app.core.errors import AppError
 from app.core.errors import ValidationAppError
+from app.deployments.service import DeploymentService
 from app.documents.models import DocumentType
 from app.documents.service import DocumentService
 from app.ops.service import OpsDashboardService
@@ -46,6 +47,7 @@ class CastorOpsApiFacade:
         ops_service: OpsDashboardService | None = None,
         timeline_service: TimelineService | None = None,
         document_service: DocumentService | None = None,
+        deployment_service: DeploymentService | None = None,
         identity_provider: DemoIdentityProvider | None = None,
         approval_service: ApprovalService | None = None,
     ) -> None:
@@ -60,6 +62,7 @@ class CastorOpsApiFacade:
         self._ops_service = ops_service
         self._timeline_service = timeline_service
         self._document_service = document_service
+        self._deployment_service = deployment_service
         self._identity_provider = identity_provider or DemoIdentityProvider()
         self._approval_service = approval_service
 
@@ -779,6 +782,38 @@ class CastorOpsApiFacade:
             request_id=request_id,
         )
 
+    async def apply_failure_demo(
+        self,
+        *,
+        project_id: str,
+        error_text: str,
+        request_id: str | None = None,
+    ) -> ApiResponse:
+        guidance_response = await self.apply_failure_guidance(
+            project_id=project_id,
+            error_text=error_text,
+            request_id=request_id,
+        )
+        guidance_body = guidance_response.to_dict()
+        if guidance_body["error"] is not None:
+            return guidance_response
+        return ApiResponse.ok(
+            {
+                "simulated_failure": {
+                    "status": "failed",
+                    "adapter_mode": "demo_adapter",
+                    "error_text": error_text,
+                },
+                "diagnosis": guidance_body["data"],
+                "recovery_demo": {
+                    "kept_previous_revision": True,
+                    "recommended_fix_applied_to_draft": True,
+                    "next_command": "Approve architecture, then run Apply again.",
+                },
+            },
+            request_id=request_id,
+        )
+
     async def terraform_preview(self, *, project_id: str, request_id: str | None = None) -> ApiResponse:
         if self._architecture_service is None:
             return ApiResponse.failed(
@@ -816,6 +851,68 @@ class CastorOpsApiFacade:
         except AppError as exc:
             return ApiResponse.failed(exc, request_id=request_id)
         return ApiResponse.ok(payload, request_id=request_id)
+
+    async def cloud_run_evidence(self, *, project_id: str, request_id: str | None = None) -> ApiResponse:
+        try:
+            architecture = await self._architecture_service.latest_payload(project_id) if self._architecture_service else None
+        except AppError:
+            architecture = None
+        try:
+            deployment = await self._deployment_service.latest_payload(project_id) if self._deployment_service else None
+        except AppError:
+            deployment = None
+        return ApiResponse.ok(
+            _cloud_run_evidence_payload(architecture=architecture, deployment=deployment),
+            request_id=request_id,
+        )
+
+    async def adapter_inventory(self, *, project_id: str, request_id: str | None = None) -> ApiResponse:
+        _ = project_id
+        return ApiResponse.ok(
+            {
+                "runtime": {"product": "Cloud Run", "mode": "live_deploy_supported"},
+                "ai_generation": {"provider": "Gemini/Vertex AI", "mode": "pending_final_live_credentials"},
+                "requirements_agent": {"mode": "demo_agent", "live_target": "Gemini"},
+                "architect_agent": {"mode": "demo_agent", "live_target": "Gemini"},
+                "security_agent": {"mode": "demo_agent", "live_target": "Gemini"},
+                "cloud_build_apply": {"mode": "demo_adapter", "live_target": "Cloud Build + Cloud Run"},
+                "github_delivery": {"mode": "demo_adapter", "live_target": "GitHub API"},
+                "terraform_preview": {"mode": "preview_only", "live_target": "future IaC adapter"},
+            },
+            request_id=request_id,
+        )
+
+    async def submission_brief(self, *, project_id: str, request_id: str | None = None) -> ApiResponse:
+        try:
+            project = await self._project_service.get_project_payload(project_id)
+        except AppError as exc:
+            return ApiResponse.failed(exc, request_id=request_id)
+        return ApiResponse.ok(
+            {
+                "product": "CastorOps",
+                "project_id": project["id"],
+                "target_user": "Solo developers and small teams that can build an app but struggle to explain and operate GCP infrastructure.",
+                "problem": "AI coding tools speed up implementation, but cloud design, approval, deployment, and operations remain hard to inspect.",
+                "agent_value": "CastorOps turns an idea into requirements, design docs, a GCP architecture, approval-gated apply steps, and an Ops Dashboard with traceable decisions.",
+                "before_after": {
+                    "before": "The user has code or an idea but cannot confidently explain the GCP design or operate it.",
+                    "after": "The user can inspect why Cloud Run and related services were selected, approve changes, and monitor deployment state.",
+                },
+                "google_cloud_usage": {
+                    "required_runtime": "Cloud Run",
+                    "required_ai": "Gemini/Vertex AI final live adapter planned for submission; current demo keeps deterministic agent adapters for repeatable judging.",
+                    "supporting_services": ["Cloud Build", "Artifact Registry", "Firestore", "Cloud Logging", "Cloud Monitoring"],
+                },
+                "demo_scenes": [
+                    "Create project and follow-up questions",
+                    "Generate requirements and design documents",
+                    "Propose and edit GCP architecture",
+                    "Approve and apply architecture",
+                    "Inspect Ops Dashboard and Execution Timeline",
+                ],
+            },
+            request_id=request_id,
+        )
 
     async def generate_target_app(
         self,
@@ -1060,4 +1157,37 @@ def _github_demo_payload(
         },
         "architecture_version": latest_architecture["version"] if latest_architecture else None,
         "mode": "demo_adapter",
+    }
+
+
+def _cloud_run_evidence_payload(
+    *,
+    architecture: dict[str, Any] | None,
+    deployment: dict[str, Any] | None,
+) -> dict[str, Any]:
+    region = architecture["spec"]["region"] if architecture else "asia-northeast1"
+    service_name = "backend"
+    target_project = architecture["spec"]["project_id"] if architecture else "demo-gcp-project"
+    if deployment is None:
+        return {
+            "runtime_product": "Cloud Run",
+            "target_project": target_project,
+            "region": region,
+            "service_name": service_name,
+            "status": "not_deployed",
+            "adapter_mode": "demo_adapter",
+            "evidence": ["Dockerfile present", "Cloud Build deploy pipeline present"],
+        }
+    return {
+        "runtime_product": "Cloud Run",
+        "target_project": target_project,
+        "region": region,
+        "service_name": service_name,
+        "service_url": deployment["deployed_url"],
+        "revision": f'{service_name}-{deployment["build_id"][-8:]}',
+        "status": deployment["status"],
+        "authentication": "private-by-default demo; public access requires explicit approval",
+        "build_id": deployment["build_id"],
+        "adapter_mode": "demo_adapter",
+        "evidence": deployment["logs"],
     }

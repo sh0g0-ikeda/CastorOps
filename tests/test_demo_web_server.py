@@ -171,6 +171,23 @@ class DemoWebServerTests(unittest.IsolatedAsyncioTestCase):
                 }
             ).encode("utf-8"),
         )
+        adapter_status, _, adapter_body = await app.handle(
+            method="GET",
+            raw_path=f"/api/projects/{project_id}/adapters",
+        )
+        brief_status, _, brief_body = await app.handle(
+            method="GET",
+            raw_path=f"/api/projects/{project_id}/submission/brief",
+        )
+        cloud_run_status, _, cloud_run_body = await app.handle(
+            method="GET",
+            raw_path=f"/api/projects/{project_id}/runtime/cloud-run",
+        )
+        failure_demo_status, _, failure_demo_body = await app.handle(
+            method="POST",
+            raw_path=f"/api/projects/{project_id}/apply/failure-demo",
+            body=json.dumps({"error_text": "Cloud Run deploy failed: permission denied"}).encode("utf-8"),
+        )
 
         self.assertEqual(terraform_status, 200)
         self.assertEqual(json.loads(terraform_body.decode("utf-8"))["data"]["mode"], "preview_only")
@@ -180,6 +197,14 @@ class DemoWebServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(json.loads(review_body.decode("utf-8"))["data"]["passed"])
         self.assertEqual(image_status, 200)
         self.assertEqual(json.loads(image_body.decode("utf-8"))["data"]["mode"], "demo_image_artifact")
+        self.assertEqual(adapter_status, 200)
+        self.assertEqual(json.loads(adapter_body.decode("utf-8"))["data"]["cloud_build_apply"]["mode"], "demo_adapter")
+        self.assertEqual(brief_status, 200)
+        self.assertEqual(json.loads(brief_body.decode("utf-8"))["data"]["product"], "CastorOps")
+        self.assertEqual(cloud_run_status, 200)
+        self.assertEqual(json.loads(cloud_run_body.decode("utf-8"))["data"]["runtime_product"], "Cloud Run")
+        self.assertEqual(failure_demo_status, 200)
+        self.assertTrue(json.loads(failure_demo_body.decode("utf-8"))["data"]["recovery_demo"]["kept_previous_revision"])
 
     async def test_invalid_json_returns_validation_error(self) -> None:
         app = DemoWebApp(build_demo_facade(), target_project_id="demo-gcp-project")
