@@ -23,6 +23,7 @@ Implemented:
 - Ops dashboard eight-section aggregation and local UI rendering.
 - Timeline events with expandable rationale and SSE event encoding helpers.
 - Dependency-free local demo HTTP server and static UI for design docs, target app files, GUI architecture edits, approval modals, and apply locks.
+- One-click judging demo rebuild endpoint and browser workspace restore after reload.
 - Container runtime for Cloud Run.
 - Cloud Build pipeline for testing, building, pushing, and deploying CastorOps.
 - GitHub Actions CI for compile, unit tests, and secret pattern smoke checks.
@@ -98,6 +99,8 @@ Then open:
 ```text
 http://127.0.0.1:8080
 ```
+
+For judging or recording, click `Run Demo Flow` first. The button calls a backend one-shot demo rebuild endpoint, fills the design documents, architecture map, generated app, Ops Dashboard, Timeline, readiness evidence, Terraform preview, and GitHub demo payload in one pass. The browser remembers the last project id for reload recovery while the server process is alive. If an in-memory Cloud Run instance restarts and state disappears, click `Run Demo Flow` again to recreate a complete judging workspace.
 
 Run the same server in a container:
 

@@ -5,6 +5,7 @@ const state = {
   latestPreview: null,
   applyInProgress: false,
 };
+const STORAGE_KEY = "castorops.projectId";
 
 const output = document.querySelector("#responseOutput");
 const projectIdView = document.querySelector("#projectId");
@@ -31,7 +32,10 @@ async function api(path, options = {}) {
   state.latestResponse = body;
   output.textContent = JSON.stringify(body, null, 2);
   if (!response.ok || body.error) {
-    throw new Error(body.error ? body.error.message : `HTTP ${response.status}`);
+    const error = new Error(body.error ? body.error.message : `HTTP ${response.status}`);
+    error.apiError = body.error || { code: `HTTP_${response.status}`, details: {} };
+    error.status = response.status;
+    throw error;
   }
   return body.data;
 }
@@ -45,6 +49,77 @@ async function refreshProject() {
   projectPhaseView.textContent = project.phase;
 }
 
+function persistProjectId(projectId) {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, projectId);
+  } catch (error) {
+    // Browser storage can be unavailable in some embedded review contexts.
+  }
+}
+
+function clearPersistedProjectId() {
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch (error) {
+    // Best-effort cleanup only.
+  }
+}
+
+function restoreProjectId() {
+  try {
+    const projectId = window.localStorage.getItem(STORAGE_KEY);
+    if (projectId) {
+      state.projectId = projectId;
+      projectIdView.textContent = projectId;
+      projectPhaseView.textContent = "restoring";
+    }
+  } catch (error) {
+    state.projectId = null;
+  }
+}
+
+async function restoreWorkspace() {
+  restoreProjectId();
+  if (!state.projectId) {
+    return;
+  }
+  try {
+    await refreshProject();
+    await refreshWorkspacePanels();
+    serverStatus.textContent = "Server ready - workspace restored";
+  } catch (error) {
+    if (error.apiError?.code === "NOT_FOUND") {
+      clearPersistedProjectId();
+      state.projectId = null;
+      projectIdView.textContent = "-";
+      projectPhaseView.textContent = "-";
+      serverStatus.textContent = "Server ready - run demo flow to rebuild state";
+      return;
+    }
+    throw error;
+  }
+}
+
+async function refreshWorkspacePanels() {
+  await safeLoad(loadArchitecture);
+  await safeLoad(loadDocuments);
+  await safeLoad(loadTargetApp);
+  await safeLoad(loadOps);
+  await safeLoad(loadTimeline);
+  await safeLoad(loadSubmissionBrief);
+  await safeLoad(loadCloudRunEvidence);
+}
+
+async function safeLoad(loader) {
+  try {
+    await loader();
+  } catch (error) {
+    if (error.apiError?.code !== "NOT_FOUND" && error.apiError?.code !== "PHASE_CONFLICT") {
+      throw error;
+    }
+  }
+}
+
 async function createProject() {
   const data = await api("/api/projects", {
     method: "POST",
@@ -54,11 +129,15 @@ async function createProject() {
     }),
   });
   state.projectId = data.id;
+  persistProjectId(data.id);
   projectIdView.textContent = data.id;
   projectPhaseView.textContent = data.phase;
 }
 
 async function requireProject() {
+  if (!state.projectId) {
+    restoreProjectId();
+  }
   if (!state.projectId) {
     await createProject();
   }
@@ -131,32 +210,52 @@ async function approve(gate) {
 }
 
 async function runDemoFlow() {
-  await createProject();
-  const projectId = await requireProject();
-  await api(`/api/projects/${projectId}/follow-up`, { method: "POST", body: "{}" });
-  await api(`/api/projects/${projectId}/requirements`, { method: "POST", body: "{}" });
-  await approve("requirements");
-  await api(`/api/projects/${projectId}/designs`, { method: "POST", body: "{}" });
-  await loadDocuments();
-  await approve("design");
-  await api(`/api/projects/${projectId}/architecture`, {
-    method: "POST",
-    body: JSON.stringify({ target_project_id: document.querySelector("#targetProjectId").value }),
-  });
-  await loadArchitecture();
-  await api(`/api/projects/${projectId}/security`, { method: "POST", body: "{}" });
-  await approve("architecture");
-  await generateTargetApp();
-  await loadTargetApp();
   setApplyLock(true);
   try {
-    await api(`/api/projects/${projectId}/apply`, { method: "POST", body: "{}" });
+    const result = await api("/api/demo/run", {
+      method: "POST",
+      body: JSON.stringify({
+        name: document.querySelector("#projectName").value,
+        idea: document.querySelector("#projectIdea").value,
+        target_project_id: document.querySelector("#targetProjectId").value,
+        repo_url: document.querySelector("#githubRepoUrl").value,
+        failure_text: document.querySelector("#failureText").value,
+      }),
+    });
+    state.projectId = result.project_id;
+    persistProjectId(result.project_id);
+    renderFullWorkspace(result);
   } finally {
     setApplyLock(false);
   }
-  await loadOps();
-  await loadTimeline();
-  await refreshProject();
+}
+
+function renderFullWorkspace(result) {
+  const project = result.project || {};
+  projectIdView.textContent = result.project_id || project.id || "-";
+  projectPhaseView.textContent = project.phase || "-";
+  if (result.architecture) {
+    state.latestArchitecture = result.architecture;
+    renderArchitecture(result.architecture);
+  }
+  if (Array.isArray(result.design_documents)) {
+    renderDocuments(result.design_documents);
+  }
+  if (result.target_app) {
+    renderTargetApp(result.target_app);
+  }
+  if (result.ops) {
+    renderOps(result.ops);
+  }
+  if (Array.isArray(result.timeline)) {
+    renderTimeline(result.timeline);
+  }
+  if (result.readiness) {
+    renderReadinessBundle(result.readiness);
+  }
+  if (result.optional_delivery) {
+    renderAddonResult("Optional Delivery Evidence", result.optional_delivery);
+  }
 }
 
 async function loadArchitecture() {
@@ -563,9 +662,29 @@ function renderReadinessResult(title, result) {
   readinessPanel.appendChild(renderDocument(title, JSON.stringify(result, null, 2)));
 }
 
+function renderReadinessBundle(readiness) {
+  readinessPanel.classList.remove("empty");
+  readinessPanel.replaceChildren();
+  const titles = {
+    submission_brief: "Submission Brief",
+    cloud_run_evidence: "Cloud Run Evidence",
+    adapter_inventory: "Adapter Inventory",
+    failure_recovery_demo: "Failure Recovery Demo",
+  };
+  for (const [key, title] of Object.entries(titles)) {
+    if (readiness[key]) {
+      readinessPanel.appendChild(renderDocument(title, JSON.stringify(readiness[key], null, 2)));
+    }
+  }
+}
+
 async function loadDocuments() {
   const projectId = await requireProject();
   const documents = await api(`/api/projects/${projectId}/documents`);
+  renderDocuments(documents);
+}
+
+function renderDocuments(documents) {
   designDocs.classList.remove("empty");
   designDocs.replaceChildren();
   if (!documents.length) {
@@ -584,6 +703,10 @@ async function loadDocuments() {
 async function loadTargetApp() {
   const projectId = await requireProject();
   const appPackage = await api(`/api/projects/${projectId}/target-app/latest`);
+  renderTargetApp(appPackage);
+}
+
+function renderTargetApp(appPackage) {
   targetFiles.classList.remove("empty");
   targetFiles.replaceChildren();
   appendText(targetFiles, "strong", appPackage.app_name);
@@ -625,6 +748,10 @@ async function reviewTargetApp() {
 async function loadOps() {
   const projectId = await requireProject();
   const ops = await api(`/api/projects/${projectId}/ops`);
+  renderOps(ops);
+}
+
+function renderOps(ops) {
   opsDashboard.classList.remove("empty");
   opsDashboard.replaceChildren();
   const orderedKeys = [
@@ -650,6 +777,10 @@ async function loadOps() {
 async function loadTimeline() {
   const projectId = await requireProject();
   const events = await api(`/api/projects/${projectId}/timeline`);
+  renderTimeline(events);
+}
+
+function renderTimeline(events) {
   timelinePanel.classList.remove("empty");
   timelinePanel.replaceChildren();
   if (!events.length) {
@@ -724,6 +855,7 @@ async function checkHealth() {
   try {
     await api("/api/health");
     serverStatus.textContent = "Server ready";
+    await restoreWorkspace();
   } catch (error) {
     serverStatus.textContent = "Server unavailable";
   }
@@ -788,7 +920,7 @@ async function withBusy(operation) {
   try {
     await operation();
   } catch (error) {
-    output.textContent = JSON.stringify({ error: error.message }, null, 2);
+    renderError(error);
   } finally {
     if (!state.applyInProgress) {
       buttons.forEach((button) => {
@@ -796,6 +928,34 @@ async function withBusy(operation) {
       });
     }
   }
+}
+
+function renderError(error) {
+  const apiError = error.apiError || {};
+  const details = apiError.details || {};
+  const guidance = [];
+  if (apiError.code === "PHASE_CONFLICT") {
+    guidance.push("Run the pipeline buttons in order or use Run Demo Flow to rebuild a complete workspace.");
+    if (details.current_phase && details.requested_phase) {
+      guidance.push(`Current phase: ${details.current_phase}; requested phase: ${details.requested_phase}.`);
+    }
+  }
+  if (apiError.code === "NOT_FOUND") {
+    guidance.push("The server state may have been reset. Use Run Demo Flow to recreate the judging workspace.");
+  }
+  serverStatus.textContent = guidance[0] || "Action failed";
+  output.textContent = JSON.stringify(
+    {
+      error: {
+        message: error.message,
+        code: apiError.code || "CLIENT_ERROR",
+        details,
+        guidance,
+      },
+    },
+    null,
+    2,
+  );
 }
 
 checkHealth();
