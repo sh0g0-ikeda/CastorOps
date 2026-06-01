@@ -21,6 +21,7 @@
     <main class="layout">
       <section class="panel intake">
         <h2>プロジェクト入力</h2>
+        <p class="panelHelp">まず題材を入力します。迷ったらそのまま「デモ一括実行」を押してください。</p>
         <label>
           プロジェクト名
           <input id="projectName" value="サポートデスク デモ">
@@ -34,8 +35,8 @@
           <input id="targetProjectId" value="demo-gcp-project">
         </label>
         <div class="buttonRow">
-          <button id="createProjectButton">プロジェクト作成</button>
-          <button id="runDemoButton">デモ一括実行</button>
+          <button id="runDemoButton" class="primaryAction">デモ一括実行</button>
+          <button id="createProjectButton" class="secondaryButton">空のプロジェクトを作成</button>
         </div>
         <dl class="facts">
           <div>
@@ -50,28 +51,94 @@
       </section>
 
       <section class="panel steps">
-        <h2>パイプライン</h2>
-        <div class="stepGrid">
-          <button data-step="follow-up">追加質問</button>
-          <button data-step="requirements">要件定義</button>
-          <button data-step="approve-requirements">要件を承認</button>
-          <button data-step="designs">設計書生成</button>
-          <button data-step="approve-design">設計を承認</button>
-          <button data-step="architecture">構成提案</button>
-          <button data-step="security">セキュリティ評価</button>
-          <button data-step="approve-architecture">構成を承認</button>
-          <button data-step="target-app">アプリ生成</button>
-          <button data-step="apply">Apply</button>
-          <button data-step="ops">運用ダッシュボード</button>
-          <button data-step="timeline">タイムライン</button>
+        <h2>作業フロー</h2>
+        <p class="panelHelp">各行がひとつの成果物です。「作成 → 確認 → 承認」の対応をこの順で見ます。</p>
+        <div class="workflowList">
+          <article class="workflowStage">
+            <div class="stageHead">
+              <span class="stageNumber">1</span>
+              <div>
+                <h3>要件定義書</h3>
+                <p>追加質問を出し、要件定義書を作成してから承認します。</p>
+              </div>
+            </div>
+            <div class="stageActions">
+              <button data-step="follow-up" class="secondaryButton">追加質問を作る</button>
+              <button data-step="requirements">要件定義書を作成</button>
+              <button type="button" data-scroll-target="designDocs" class="secondaryButton">生成物を確認</button>
+              <button data-step="approve-requirements" class="approvalButton">要件を承認</button>
+            </div>
+          </article>
+
+          <article class="workflowStage">
+            <div class="stageHead">
+              <span class="stageNumber">2</span>
+              <div>
+                <h3>設計書セット</h3>
+                <p>基本設計、API設計、データ設計、運用設計などをまとめて生成します。</p>
+              </div>
+            </div>
+            <div class="stageActions">
+              <button data-step="designs">設計書を生成</button>
+              <button type="button" data-scroll-target="designDocs" class="secondaryButton">設計書を確認</button>
+              <button data-step="approve-design" class="approvalButton">設計を承認</button>
+            </div>
+          </article>
+
+          <article class="workflowStage">
+            <div class="stageHead">
+              <span class="stageNumber">3</span>
+              <div>
+                <h3>クラウド構成</h3>
+                <p>GCP構成を提案し、セキュリティ評価を見てから承認します。</p>
+              </div>
+            </div>
+            <div class="stageActions">
+              <button data-step="architecture">構成案を作成</button>
+              <button data-step="security" class="secondaryButton">セキュリティ評価</button>
+              <button type="button" data-scroll-target="architectureMap" class="secondaryButton">構成を確認・編集</button>
+              <button data-step="approve-architecture" class="approvalButton">構成を承認</button>
+            </div>
+          </article>
+
+          <article class="workflowStage">
+            <div class="stageHead">
+              <span class="stageNumber">4</span>
+              <div>
+                <h3>アプリ生成とApply</h3>
+                <p>サンプルAPI、Dockerfile、テストを生成し、承認済み構成をApplyします。</p>
+              </div>
+            </div>
+            <div class="stageActions">
+              <button data-step="target-app">アプリを生成</button>
+              <button type="button" data-scroll-target="targetFiles" class="secondaryButton">生成コードを確認</button>
+              <button data-step="apply" class="approvalButton">Applyする</button>
+            </div>
+          </article>
+
+          <article class="workflowStage">
+            <div class="stageHead">
+              <span class="stageNumber">5</span>
+              <div>
+                <h3>運用確認</h3>
+                <p>デプロイ状態、コスト、ログ、AI判断履歴、提出用説明を確認します。</p>
+              </div>
+            </div>
+            <div class="stageActions">
+              <button data-step="ops">運用ダッシュボードを見る</button>
+              <button data-step="timeline" class="secondaryButton">判断履歴を見る</button>
+              <button type="button" data-scroll-target="readinessPanel" class="secondaryButton">提出準備を見る</button>
+            </div>
+          </article>
         </div>
       </section>
 
       <section class="panel architecture">
         <h2>クラウド構成マップ</h2>
+        <p class="panelHelp">構成案を見て、Cloud Runなどのノードを選び、設定変更の影響を確認してからドラフト保存します。</p>
         <div id="architectureMap" class="map empty">まだ構成はありません</div>
         <form id="nodeEditForm" class="nodeEditor">
-          <h3>GUI構成編集</h3>
+          <h3>1. ノード設定を編集</h3>
           <label>
             ノードID
             <input id="nodeId" value="backend">
@@ -103,7 +170,7 @@
         </form>
         <div id="impactPanel" class="impact empty">ドラフト保存前に影響を確認できます。</div>
         <form id="chatChangeForm" class="nodeEditor">
-          <h3>チャットで再依頼</h3>
+          <h3>2. 自然文で再提案</h3>
           <label>
             変更依頼
             <textarea id="changeRequest">backendを公開し、メモリを1Giにしてください</textarea>
@@ -111,7 +178,7 @@
           <button type="submit">チャットから再提案</button>
         </form>
         <form id="nodeAddForm" class="nodeEditor">
-          <h3>ノード追加</h3>
+          <h3>3. ノード追加</h3>
           <label>
             新規ノードID
             <input id="newNodeId" value="secrets">
@@ -139,7 +206,7 @@
           <button type="submit">ノード追加ドラフト</button>
         </form>
         <form id="edgeEditForm" class="nodeEditor">
-          <h3>接続編集</h3>
+          <h3>4. 接続編集</h3>
           <label>
             接続ID
             <input id="edgeId" value="backend-secrets">
@@ -176,11 +243,13 @@
 
       <section class="panel docs">
         <h2>生成された設計書</h2>
-        <div id="designDocs" class="documentList empty">設計書を生成するとここで確認できます。</div>
+        <p class="panelHelp">要件定義書と設計書はここにまとまります。承認前にこの中身を確認します。</p>
+        <div id="designDocs" class="documentList empty">要件定義書または設計書を生成するとここで確認できます。</div>
       </section>
 
       <section class="panel target">
         <h2>生成アプリパッケージ</h2>
+        <p class="panelHelp">APIのフィールドや環境変数を変えて、生成コードを確認できます。</p>
         <form id="targetAppForm" class="nodeEditor">
           <label>
             APIフィールド
@@ -200,11 +269,13 @@
 
       <section class="panel ops">
         <h2>運用ダッシュボード</h2>
+        <p class="panelHelp">Apply後の状態、コスト、セキュリティ、次にやるべきことを確認します。</p>
         <div id="opsDashboard" class="dashboard empty">パイプラインを実行すると運用情報が表示されます。</div>
       </section>
 
       <section class="panel readiness">
         <h2>ハッカソン提出準備</h2>
+        <p class="panelHelp">提出や録画で説明する材料です。最終提出時は英語版へ戻します。</p>
         <div class="buttonRow">
           <button type="button" id="submissionBriefButton">提出説明</button>
           <button type="button" id="cloudRunEvidenceButton">Cloud Run証跡</button>
@@ -216,6 +287,7 @@
 
       <section class="panel addons">
         <h2>任意の追加デモ</h2>
+        <p class="panelHelp">必要な時だけ使う補助機能です。まずは上の作業フローだけで十分です。</p>
         <label>
           画像メモ名
           <input id="imageArtifactName" value="sketch.png">
@@ -244,6 +316,7 @@
 
       <section class="panel timeline">
         <h2>実行タイムライン</h2>
+        <p class="panelHelp">どのエージェントが何を判断したかを時系列で確認できます。</p>
         <div id="timelinePanel" class="timelineList empty">パイプラインを実行するとエージェントの判断履歴が表示されます。</div>
       </section>
 

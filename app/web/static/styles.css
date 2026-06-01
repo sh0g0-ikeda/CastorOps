@@ -80,12 +80,19 @@ body.applying .lockStatus {
 .panel h2 {
   font-size: 17px;
   line-height: 1.2;
-  margin: 0 0 14px;
+  margin: 0 0 8px;
 }
 
 .panel h3 {
   font-size: 14px;
   margin: 16px 0 10px;
+}
+
+.panelHelp {
+  color: #52616f;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0 0 14px;
 }
 
 .intake,
@@ -139,6 +146,22 @@ button {
   font-weight: 700;
   min-height: 38px;
   padding: 8px 12px;
+}
+
+.primaryAction {
+  background: #0b57d0;
+}
+
+.primaryAction:hover {
+  background: #0842a0;
+}
+
+.approvalButton {
+  background: #1e8e3e;
+}
+
+.approvalButton:hover {
+  background: #167033;
 }
 
 button:hover {
@@ -204,10 +227,68 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
-.stepGrid {
+.workflowList {
+  display: grid;
+  gap: 0;
+}
+
+.workflowStage {
+  border-top: 1px solid #e5eaf0;
+  display: grid;
+  gap: 10px;
+  padding: 14px 0;
+}
+
+.workflowStage:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.workflowStage:last-child {
+  padding-bottom: 0;
+}
+
+.stageHead {
+  align-items: flex-start;
+  display: flex;
+  gap: 10px;
+}
+
+.stageHead h3 {
+  font-size: 14px;
+  margin: 0 0 4px;
+}
+
+.stageHead p {
+  color: #52616f;
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.stageNumber {
+  align-items: center;
+  background: #e8f0fe;
+  border: 1px solid #c2d7ff;
+  border-radius: 999px;
+  color: #0b57d0;
+  display: inline-flex;
+  flex: 0 0 26px;
+  font-size: 13px;
+  font-weight: 800;
+  height: 26px;
+  justify-content: center;
+  line-height: 1;
+}
+
+.stageActions {
   display: grid;
   gap: 8px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stageActions button {
+  min-height: 42px;
 }
 
 .map {
@@ -287,6 +368,19 @@ button:disabled {
   gap: 10px;
   min-height: 120px;
   padding: 12px;
+}
+
+.focusFlash {
+  animation: focus-flash 1.2s ease-out;
+}
+
+@keyframes focus-flash {
+  0% {
+    box-shadow: 0 0 0 3px rgba(25, 103, 210, 0.32);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(25, 103, 210, 0);
+  }
 }
 
 .impact span {
