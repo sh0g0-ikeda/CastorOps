@@ -126,11 +126,11 @@ To use the real Gemini API for agent generation:
 ```powershell
 $env:CASTOROPS_AGENT_PROVIDER = "gemini"
 $env:GEMINI_API_KEY = "your-gemini-api-key"
-$env:GEMINI_MODEL = "gemini-2.5-flash"
+$env:GEMINI_MODEL = "gemini-3-flash-preview"
 python scripts\serve_demo.py --host 127.0.0.1 --port 8080 --target-project-id demo-gcp-project
 ```
 
-`GEMINI_MODEL` is optional and defaults to `gemini-2.5-flash`. The direct REST adapter sends the key in the `x-goog-api-key` header and requests JSON structured output from Gemini. Do not commit the key; set it as a local environment variable or a Cloud Run secret-backed environment variable.
+`GEMINI_MODEL` is optional and defaults to `gemini-3-flash-preview`. The direct REST adapter sends the key in the `x-goog-api-key` header and requests JSON structured output from Gemini. Do not commit the key; set it as a local environment variable or a Cloud Run secret-backed environment variable.
 
 For a Cloud Run demo deployment:
 

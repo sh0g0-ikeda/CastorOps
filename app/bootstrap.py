@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 
+from app.agents.gemini import DEFAULT_GEMINI_MODEL
 from app.agents.gemini import GeminiApiConfig
 from app.agents.gemini import GeminiArchitectGenerator
 from app.agents.gemini import GeminiGcpPlannerGenerator
@@ -149,7 +150,7 @@ def _build_agent_generators(agent_provider_mode: str) -> _AgentGenerators:
         client = GeminiJsonClient(
             GeminiApiConfig(
                 api_key=os.environ.get("GEMINI_API_KEY", ""),
-                model=os.environ.get("GEMINI_MODEL", "gemini-2.5-flash"),
+                model=os.environ.get("GEMINI_MODEL", DEFAULT_GEMINI_MODEL),
                 endpoint=os.environ.get("GEMINI_API_ENDPOINT", "https://generativelanguage.googleapis.com/v1beta"),
                 timeout_seconds=float(os.environ.get("GEMINI_TIMEOUT_SECONDS", "45")),
             )
