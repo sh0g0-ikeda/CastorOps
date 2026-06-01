@@ -150,6 +150,7 @@ async function runStep(step) {
     await api(`/api/projects/${projectId}/follow-up`, { method: "POST", body: "{}" });
   } else if (step === "requirements") {
     await api(`/api/projects/${projectId}/requirements`, { method: "POST", body: "{}" });
+    await loadDocuments();
   } else if (step === "approve-requirements") {
     await approveWithModal("requirements");
   } else if (step === "designs") {
@@ -168,6 +169,7 @@ async function runStep(step) {
     await loadOps();
   } else if (step === "approve-architecture") {
     await approveWithModal("architecture");
+    await loadTimeline();
   } else if (step === "target-app") {
     await generateTargetApp();
     await loadTargetApp();
@@ -179,6 +181,21 @@ async function runStep(step) {
     await loadTimeline();
   }
   await refreshProject();
+}
+
+async function scrollToTarget(targetId) {
+  if (targetId === "readinessPanel") {
+    await safeLoad(loadSubmissionBrief);
+    await safeLoad(loadCloudRunEvidence);
+    await safeLoad(loadAdapterInventory);
+  }
+  const target = document.querySelector(`#${targetId}`);
+  if (!target) {
+    return;
+  }
+  target.scrollIntoView({ behavior: "smooth", block: "start" });
+  target.classList.add("focusFlash");
+  window.setTimeout(() => target.classList.remove("focusFlash"), 1200);
 }
 
 async function approveWithModal(gate) {
@@ -931,6 +948,9 @@ document.querySelector("#githubDemoButton").addEventListener("click", () => with
 document.querySelector("#failureGuidanceButton").addEventListener("click", () => withBusy(loadFailureGuidance));
 for (const button of document.querySelectorAll("[data-step]")) {
   button.addEventListener("click", () => withBusy(() => runStep(button.dataset.step)));
+}
+for (const button of document.querySelectorAll("[data-scroll-target]")) {
+  button.addEventListener("click", () => withBusy(() => scrollToTarget(button.dataset.scrollTarget)));
 }
 
 async function withBusy(operation) {
