@@ -71,7 +71,7 @@ function restoreProjectId() {
     if (projectId) {
       state.projectId = projectId;
       projectIdView.textContent = projectId;
-      projectPhaseView.textContent = "restoring";
+      projectPhaseView.textContent = "復元中";
     }
   } catch (error) {
     state.projectId = null;
@@ -86,14 +86,14 @@ async function restoreWorkspace() {
   try {
     await refreshProject();
     await refreshWorkspacePanels();
-    serverStatus.textContent = "Server ready - workspace restored";
+    serverStatus.textContent = "サーバ準備完了 - ワークスペース復元済み";
   } catch (error) {
     if (error.apiError?.code === "NOT_FOUND") {
       clearPersistedProjectId();
       state.projectId = null;
       projectIdView.textContent = "-";
       projectPhaseView.textContent = "-";
-      serverStatus.textContent = "Server ready - run demo flow to rebuild state";
+      serverStatus.textContent = "サーバ準備完了 - デモ一括実行で状態を再作成できます";
       return;
     }
     throw error;
@@ -183,12 +183,12 @@ async function runStep(step) {
 
 async function approveWithModal(gate) {
   const approved = await confirmAction(
-    `Approve ${gate}`,
+    `${gateLabel(gate)}を承認`,
     [
-      `This records an explicit approval for the ${gate} gate.`,
-      "The next pipeline step will only run after this approval is saved.",
+      `${gateLabel(gate)}ゲートの明示的な承認を記録します。`,
+      "この承認が保存されるまで次のパイプライン処理は実行されません。",
     ],
-    "Approve",
+    "承認する",
   );
   if (!approved) {
     return;
@@ -203,7 +203,7 @@ async function approve(gate) {
     body: JSON.stringify({
       gate,
       decision: "approved",
-      rationale: "Approved from demo UI",
+      rationale: "デモUIから承認",
       snapshot: state.latestResponse ? state.latestResponse.data : {},
     }),
   });
@@ -254,7 +254,7 @@ function renderFullWorkspace(result) {
     renderReadinessBundle(result.readiness);
   }
   if (result.optional_delivery) {
-    renderAddonResult("Optional Delivery Evidence", result.optional_delivery);
+    renderAddonResult("追加デモ証跡", result.optional_delivery);
   }
 }
 
@@ -274,14 +274,14 @@ function renderArchitecture(architecture) {
     item.className = "node";
     appendText(item, "strong", node.name);
     appendText(item, "span", `ID: ${node.id}`);
-    appendText(item, "span", `Type: ${node.type}`);
-    appendText(item, "span", `Cost: ${node.cost_band}`);
-    appendText(item, "span", `Params: ${JSON.stringify(node.parameters)}`);
-    appendText(item, "span", `Reason: ${node.rationale}`);
+    appendText(item, "span", `種別: ${node.type}`);
+    appendText(item, "span", `コスト帯: ${node.cost_band}`);
+    appendText(item, "span", `パラメータ: ${JSON.stringify(node.parameters)}`);
+    appendText(item, "span", `理由: ${node.rationale}`);
     const selectButton = document.createElement("button");
     selectButton.type = "button";
     selectButton.className = "secondaryButton smallButton";
-    selectButton.textContent = "Edit";
+    selectButton.textContent = "編集";
     selectButton.addEventListener("click", () => selectNode(node));
     item.appendChild(selectButton);
     architectureMap.appendChild(item);
@@ -291,7 +291,7 @@ function renderArchitecture(architecture) {
     item.className = "edge";
     appendText(item, "strong", edge.id);
     appendText(item, "span", `${edge.from_node} -> ${edge.to_node}`);
-    appendText(item, "span", `Type: ${edge.type}`);
+    appendText(item, "span", `種別: ${edge.type}`);
     appendText(item, "span", edge.description);
     architectureMap.appendChild(item);
   }
@@ -303,7 +303,7 @@ async function runSecurityLoop() {
     method: "POST",
     body: JSON.stringify({ rounds: 2 }),
   });
-  renderAddonResult("Security Multi-round", result);
+  renderAddonResult("複数回セキュリティ評価", result);
   await loadTimeline();
 }
 
@@ -316,7 +316,7 @@ async function captureImageRequirement() {
       description: document.querySelector("#imageArtifactNote").value,
     }),
   });
-  renderAddonResult("Image Requirement Artifact", result);
+  renderAddonResult("画像要件メモ", result);
 }
 
 function selectNode(node) {
@@ -339,9 +339,9 @@ async function previewNodeEdit() {
   state.latestPreview = preview;
   renderImpact(preview);
   await confirmAction(
-    "Impact Review",
+    "影響レビュー",
     impactLines(preview),
-    "Close",
+    "閉じる",
   );
 }
 
@@ -354,7 +354,7 @@ async function saveNodeEdit(event) {
   });
   state.latestPreview = preview;
   renderImpact(preview);
-  const accepted = await confirmAction("Save Draft After Impact Review", impactLines(preview), "Save Draft");
+  const accepted = await confirmAction("影響確認後にドラフト保存", impactLines(preview), "ドラフト保存");
   if (!accepted) {
     return;
   }
@@ -362,7 +362,7 @@ async function saveNodeEdit(event) {
     method: "POST",
     body: JSON.stringify({
       ...nodePatchPayload(),
-      change_reason: "Adjusted Cloud Run parameters from demo UI",
+      change_reason: "デモUIからCloud Runパラメータを調整",
     }),
   });
   await loadArchitecture();
@@ -374,24 +374,24 @@ async function deleteNode() {
   const nodeId = document.querySelector("#nodeId").value.trim();
   const node = (state.latestArchitecture?.spec.nodes || []).find((item) => item.id === nodeId);
   const firstConfirm = await confirmAction(
-    "Delete Node",
+    "ノード削除",
     [
-      `Node: ${nodeId}`,
-      node ? `This removes ${node.name} and every connected edge from the draft architecture.` : "This removes the selected node if it exists.",
-      "This is a destructive architecture edit and requires a second confirmation.",
+      `ノード: ${nodeId}`,
+      node ? `${node.name} と接続中のすべてのエッジをドラフト構成から削除します。` : "対象ノードが存在する場合、そのノードを削除します。",
+      "破壊的な構成編集のため、次にもう一度確認します。",
     ],
-    "Continue",
+    "続行",
   );
   if (!firstConfirm) {
     return;
   }
   const secondConfirm = await confirmAction(
-    "Confirm Node Deletion",
+    "ノード削除の最終確認",
     [
-      "Second confirmation required.",
-      "The operation creates a new architecture draft version. It does not apply cloud changes until the architecture is approved and applied.",
+      "2回目の確認です。",
+      "この操作は新しい構成ドラフトを作成します。構成を承認してApplyするまでクラウド変更は反映されません。",
     ],
-    "Delete Node",
+    "ノード削除",
   );
   if (!secondConfirm) {
     return;
@@ -401,7 +401,7 @@ async function deleteNode() {
     body: JSON.stringify({
       node_id: nodeId,
       confirmed: true,
-      change_reason: "Deleted node from demo UI after two-step confirmation",
+      change_reason: "デモUIから2段階確認後にノードを削除",
     }),
   });
   await loadArchitecture();
@@ -422,13 +422,13 @@ async function reviseFromChat(event) {
     requires_confirmation: Boolean(result.changes.allow_unauthenticated),
   });
   await confirmAction(
-    "Chat Re-proposal Created",
+    "チャット再提案を作成しました",
     [
-      `Draft version: ${result.version}`,
-      `Changes: ${JSON.stringify(result.changes)}`,
-      "Review and approve the architecture again before apply.",
+      `ドラフトバージョン: ${result.version}`,
+      `変更内容: ${JSON.stringify(result.changes)}`,
+      "Apply前に構成を再確認し、承認してください。",
     ],
-    "Close",
+    "閉じる",
   );
   await loadArchitecture();
 }
@@ -443,17 +443,17 @@ async function addNode(event) {
       node_type: document.querySelector("#newNodeType").value,
       name: document.querySelector("#newNodeName").value,
       parameters: parseJsonObject(document.querySelector("#newNodeParameters").value),
-      change_reason: "Added node from architecture palette",
+      change_reason: "構成パレットからノードを追加",
     }),
   });
   await confirmAction(
-    "Node Draft Added",
+    "ノード追加ドラフトを作成しました",
     [
-      `Draft version: ${result.version}`,
-      `Node: ${result.node_id}`,
-      "Approve the architecture before applying this resource change.",
+      `ドラフトバージョン: ${result.version}`,
+      `ノード: ${result.node_id}`,
+      "このリソース変更をApplyする前に構成を承認してください。",
     ],
-    "Close",
+    "閉じる",
   );
   await loadArchitecture();
 }
@@ -469,17 +469,17 @@ async function addEdge(event) {
       to_node: document.querySelector("#edgeTo").value,
       edge_type: document.querySelector("#edgeType").value,
       description: document.querySelector("#edgeDescription").value,
-      change_reason: "Added edge from architecture editor",
+      change_reason: "構成エディタから接続を追加",
     }),
   });
   await confirmAction(
-    "Edge Draft Added",
+    "接続追加ドラフトを作成しました",
     [
-      `Draft version: ${result.version}`,
-      `Edge: ${result.edge_id}`,
-      "This relationship is now part of the draft architecture map.",
+      `ドラフトバージョン: ${result.version}`,
+      `接続: ${result.edge_id}`,
+      "この関係は構成マップのドラフトに追加されました。",
     ],
-    "Close",
+    "閉じる",
   );
   await loadArchitecture();
 }
@@ -488,12 +488,12 @@ async function deleteEdge() {
   const projectId = await requireProject();
   const edgeId = document.querySelector("#edgeId").value.trim();
   const confirmed = await confirmAction(
-    "Delete Edge",
+    "接続削除",
     [
-      `Edge: ${edgeId}`,
-      "This removes the relationship from a new architecture draft version.",
+      `接続: ${edgeId}`,
+      "新しい構成ドラフトからこの関係を削除します。",
     ],
-    "Delete Edge",
+    "接続削除",
   );
   if (!confirmed) {
     return;
@@ -502,7 +502,7 @@ async function deleteEdge() {
     method: "POST",
     body: JSON.stringify({
       edge_id: edgeId,
-      change_reason: "Deleted edge from architecture editor",
+      change_reason: "構成エディタから接続を削除",
     }),
   });
   await loadArchitecture();
@@ -522,7 +522,7 @@ function nodePatchPayload() {
 function parseJsonObject(value) {
   const parsed = JSON.parse(value || "{}");
   if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
-    throw new Error("Parameters JSON must be an object");
+    throw new Error("パラメータJSONはオブジェクトである必要があります");
   }
   return parsed;
 }
@@ -537,7 +537,7 @@ function commaList(value) {
 function renderImpact(preview) {
   impactPanel.classList.remove("empty");
   impactPanel.replaceChildren();
-  appendText(impactPanel, "strong", "Impact explanation");
+  appendText(impactPanel, "strong", "影響説明");
   for (const line of impactLines(preview)) {
     appendText(impactPanel, "span", line);
   }
@@ -546,22 +546,22 @@ function renderImpact(preview) {
 function impactLines(preview) {
   const impact = preview.impact || {};
   return [
-    impact.summary || "No summary returned.",
-    `Cost: ${impact.cost || "-"}`,
-    `Security: ${impact.security || "-"}`,
-    `Performance: ${impact.performance || "-"}`,
-    `Requires reapply: ${preview.requires_reapply ? "yes" : "no"}`,
-    `Extra confirmation: ${preview.requires_confirmation ? "yes" : "no"}`,
+    impact.summary || "要約は返されていません。",
+    `コスト: ${impact.cost || "-"}`,
+    `セキュリティ: ${impact.security || "-"}`,
+    `性能: ${impact.performance || "-"}`,
+    `再Applyが必要: ${preview.requires_reapply ? "はい" : "いいえ"}`,
+    `追加確認が必要: ${preview.requires_confirmation ? "はい" : "いいえ"}`,
   ];
 }
 
 async function applyArchitecture() {
   const projectId = await requireProject();
   const approved = await confirmAction(
-    "Apply Architecture",
+    "構成をApply",
     [
-      "The editing UI will be locked while apply is running.",
-      "Demo mode uses the local Cloud Build adapter and records the deployment result for Ops Dashboard.",
+      "Apply実行中は編集UIがロックされます。",
+      "デモモードではローカルCloud Buildアダプタを使い、デプロイ結果を運用ダッシュボードに記録します。",
     ],
     "Apply",
   );
@@ -581,7 +581,7 @@ async function applyArchitecture() {
 function setApplyLock(locked) {
   state.applyInProgress = locked;
   document.body.classList.toggle("applying", locked);
-  applyStatus.textContent = locked ? "Edit lock: apply running" : "Edit lock: open";
+  applyStatus.textContent = locked ? "編集ロック: Apply実行中" : "編集ロック: 開放中";
   for (const element of document.querySelectorAll("#nodeEditForm input, #nodeEditForm select, #nodeEditForm button")) {
     element.disabled = locked;
   }
@@ -596,7 +596,7 @@ function setApplyLock(locked) {
 async function loadTerraformPreview() {
   const projectId = await requireProject();
   const result = await api(`/api/projects/${projectId}/terraform/preview`);
-  renderAddonResult("Terraform Preview", result);
+  renderAddonResult("Terraformプレビュー", result);
 }
 
 async function runGithubDemo() {
@@ -607,25 +607,25 @@ async function runGithubDemo() {
       repo_url: document.querySelector("#githubRepoUrl").value,
     }),
   });
-  renderAddonResult("GitHub Demo Flow", result);
+  renderAddonResult("GitHubデモ", result);
 }
 
 async function loadSubmissionBrief() {
   const projectId = await requireProject();
   const result = await api(`/api/projects/${projectId}/submission/brief`);
-  renderReadinessResult("Submission Brief", result);
+  renderReadinessResult("提出説明", result);
 }
 
 async function loadCloudRunEvidence() {
   const projectId = await requireProject();
   const result = await api(`/api/projects/${projectId}/runtime/cloud-run`);
-  renderReadinessResult("Cloud Run Evidence", result);
+  renderReadinessResult("Cloud Run証跡", result);
 }
 
 async function loadAdapterInventory() {
   const projectId = await requireProject();
   const result = await api(`/api/projects/${projectId}/adapters`);
-  renderReadinessResult("Adapter Inventory", result);
+  renderReadinessResult("アダプタ一覧", result);
 }
 
 async function runFailureDemo() {
@@ -636,7 +636,7 @@ async function runFailureDemo() {
       error_text: document.querySelector("#failureText").value,
     }),
   });
-  renderReadinessResult("Failure Recovery Demo", result);
+  renderReadinessResult("障害復旧デモ", result);
 }
 
 async function loadFailureGuidance() {
@@ -647,7 +647,7 @@ async function loadFailureGuidance() {
       error_text: document.querySelector("#failureText").value,
     }),
   });
-  renderAddonResult("Apply Failure Guidance", result);
+  renderAddonResult("Apply失敗時ガイド", result);
 }
 
 function renderAddonResult(title, result) {
@@ -666,10 +666,10 @@ function renderReadinessBundle(readiness) {
   readinessPanel.classList.remove("empty");
   readinessPanel.replaceChildren();
   const titles = {
-    submission_brief: "Submission Brief",
-    cloud_run_evidence: "Cloud Run Evidence",
-    adapter_inventory: "Adapter Inventory",
-    failure_recovery_demo: "Failure Recovery Demo",
+    submission_brief: "提出説明",
+    cloud_run_evidence: "Cloud Run証跡",
+    adapter_inventory: "アダプタ一覧",
+    failure_recovery_demo: "障害復旧デモ",
   };
   for (const [key, title] of Object.entries(titles)) {
     if (readiness[key]) {
@@ -689,7 +689,7 @@ function renderDocuments(documents) {
   designDocs.replaceChildren();
   if (!documents.length) {
     designDocs.classList.add("empty");
-    designDocs.textContent = "No documents generated yet.";
+    designDocs.textContent = "まだ設計書は生成されていません。";
     return;
   }
   for (const documentPayload of documents) {
@@ -739,9 +739,9 @@ async function reviewTargetApp() {
     body: "{}",
   });
   await confirmAction(
-    "AI Code Review",
+    "AIコードレビュー",
     review.findings.map((finding) => `${finding.severity}: ${finding.message} ${finding.suggestion}`),
-    "Close",
+    "閉じる",
   );
 }
 
@@ -767,7 +767,7 @@ function renderOps(ops) {
   for (const key of orderedKeys) {
     const item = document.createElement("article");
     item.className = "metric";
-    appendText(item, "strong", titleize(key));
+    appendText(item, "strong", opsLabel(key));
     appendText(item, "span", summary(ops[key]));
     item.appendChild(renderMiniJson(ops[key]));
     opsDashboard.appendChild(item);
@@ -785,7 +785,7 @@ function renderTimeline(events) {
   timelinePanel.replaceChildren();
   if (!events.length) {
     timelinePanel.classList.add("empty");
-    timelinePanel.textContent = "No events recorded yet.";
+    timelinePanel.textContent = "まだイベントは記録されていません。";
     return;
   }
   for (const event of events) {
@@ -794,13 +794,13 @@ function renderTimeline(events) {
     const summaryElement = document.createElement("summary");
     summaryElement.textContent = `${event.result.toUpperCase()} - ${event.action}`;
     details.appendChild(summaryElement);
-    appendText(details, "span", `Agent: ${event.agent_name || "-"}`);
-    appendText(details, "span", `When: ${event.occurred_at}`);
-    appendText(details, "span", `Reason: ${event.rationale_md || "No rationale recorded."}`);
-    appendText(details, "span", `Decision: ${event.metadata?.decision || "-"}`);
-    appendText(details, "span", `Tool: ${event.metadata?.tool_boundary || "-"}`);
-    appendText(details, "span", `Adapter: ${event.metadata?.adapter_mode || "-"}`);
-    appendText(details, "span", `Next: ${event.metadata?.next_expected_action || "-"}`);
+    appendText(details, "span", `エージェント: ${event.agent_name || "-"}`);
+    appendText(details, "span", `時刻: ${event.occurred_at}`);
+    appendText(details, "span", `理由: ${event.rationale_md || "理由は記録されていません。"}`);
+    appendText(details, "span", `判断: ${event.metadata?.decision || "-"}`);
+    appendText(details, "span", `ツール境界: ${event.metadata?.tool_boundary || "-"}`);
+    appendText(details, "span", `アダプタ: ${event.metadata?.adapter_mode || "-"}`);
+    appendText(details, "span", `次の想定アクション: ${event.metadata?.next_expected_action || "-"}`);
     details.appendChild(renderMiniJson(event.metadata || {}));
     timelinePanel.appendChild(details);
   }
@@ -832,6 +832,27 @@ function titleize(value) {
     .join(" ");
 }
 
+function opsLabel(key) {
+  return {
+    system_overview: "システム概要",
+    architecture_map: "構成マップ",
+    deployment_status: "デプロイ状況",
+    logs_errors: "ログ・エラー",
+    cost_overview: "コスト概要",
+    security_overview: "セキュリティ概要",
+    agent_actions: "エージェント操作",
+    recommended_next_actions: "推奨次アクション",
+  }[key] || titleize(key);
+}
+
+function gateLabel(gate) {
+  return {
+    requirements: "要件",
+    design: "設計",
+    architecture: "構成",
+  }[gate] || gate;
+}
+
 function summary(value) {
   if (value === null || value === undefined) {
     return "-";
@@ -840,7 +861,7 @@ function summary(value) {
     return String(value);
   }
   if (Array.isArray(value)) {
-    return `${value.length} item(s)`;
+    return `${value.length} 件`;
   }
   return Object.keys(value).slice(0, 6).join(", ");
 }
@@ -854,10 +875,10 @@ function appendText(parent, tagName, value) {
 async function checkHealth() {
   try {
     await api("/api/health");
-    serverStatus.textContent = "Server ready";
+    serverStatus.textContent = "サーバ準備完了";
     await restoreWorkspace();
   } catch (error) {
-    serverStatus.textContent = "Server unavailable";
+    serverStatus.textContent = "サーバに接続できません";
   }
 }
 
@@ -935,15 +956,15 @@ function renderError(error) {
   const details = apiError.details || {};
   const guidance = [];
   if (apiError.code === "PHASE_CONFLICT") {
-    guidance.push("Run the pipeline buttons in order or use Run Demo Flow to rebuild a complete workspace.");
+    guidance.push("パイプラインを順番に実行するか、デモ一括実行で完全なワークスペースを再作成してください。");
     if (details.current_phase && details.requested_phase) {
-      guidance.push(`Current phase: ${details.current_phase}; requested phase: ${details.requested_phase}.`);
+      guidance.push(`現在フェーズ: ${details.current_phase}; 要求フェーズ: ${details.requested_phase}.`);
     }
   }
   if (apiError.code === "NOT_FOUND") {
-    guidance.push("The server state may have been reset. Use Run Demo Flow to recreate the judging workspace.");
+    guidance.push("サーバ状態がリセットされた可能性があります。デモ一括実行で審査用ワークスペースを再作成してください。");
   }
-  serverStatus.textContent = guidance[0] || "Action failed";
+  serverStatus.textContent = guidance[0] || "操作に失敗しました";
   output.textContent = JSON.stringify(
     {
       error: {

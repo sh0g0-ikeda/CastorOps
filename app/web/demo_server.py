@@ -254,11 +254,11 @@ class DemoWebApp:
     async def _run_demo_flow(self, payload: dict[str, Any]) -> tuple[int, str, bytes]:
         """Run the full judging demo from the backend to avoid fragile client step chains."""
 
-        name = _demo_string(payload, "name", "Support Desk Demo")
+        name = _demo_string(payload, "name", "サポートデスク デモ")
         idea = _demo_string(
             payload,
             "idea",
-            "Build a support desk API that stores tickets, exposes health checks, and can be deployed on Cloud Run.",
+            "問い合わせチケットを保存し、ヘルスチェックを持ち、Cloud RunにデプロイできるサポートデスクAPIを作りたい。",
         )
         target_project_id = _demo_string(payload, "target_project_id", self._target_project_id)
         repo_url = _demo_string(payload, "repo_url", "https://github.com/sh0g0-ikeda/CastorOps")

@@ -78,7 +78,7 @@ class DemoWebServerTests(unittest.IsolatedAsyncioTestCase):
         chat_status, _, chat_body = await app.handle(
             method="POST",
             raw_path=f"/api/projects/{project_id}/architecture/chat-revise",
-            body=json.dumps({"message": "use 1Gi memory"}).encode("utf-8"),
+            body=json.dumps({"message": "backendを公開し、メモリを1Giにしてください"}).encode("utf-8"),
         )
         add_node_status, _, add_node_body = await app.handle(
             method="POST",
@@ -117,6 +117,7 @@ class DemoWebServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(json.loads(delete_body.decode("utf-8"))["data"]["version"], 2)
         self.assertEqual(chat_status, 200)
         self.assertEqual(json.loads(chat_body.decode("utf-8"))["data"]["changes"]["memory"], "1Gi")
+        self.assertTrue(json.loads(chat_body.decode("utf-8"))["data"]["changes"]["allow_unauthenticated"])
         self.assertEqual(add_node_status, 200)
         self.assertEqual(json.loads(add_node_body.decode("utf-8"))["data"]["node_id"], "secrets")
         self.assertEqual(add_edge_status, 200)
